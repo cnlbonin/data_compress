@@ -1,0 +1,27 @@
+[project]
+name = "data-compress"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Yu-Ting Wei", email = "ytsimon2004@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.4.6",
+    "rich>=15.0.0",
+    "tifffile>=2026.3.3",
+    "typer>=0.27.2",
+]
+
+[project.scripts]
+data-compress = "data_compress:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
