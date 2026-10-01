@@ -21,14 +21,13 @@ REQUIRED_BINARIES = ("ffmpeg", "ffprobe")
 class CodecProfile:
     container_ext: str
     ffmpeg_video_codec: str
-    pix_fmt: str
+    pix_fmt: str  # raw format of the bytes we actually write to ffmpeg's stdin
+    encode_pix_fmt: str  # format we ask the encoder to produce (may differ from pix_fmt)
     extra_args: list[str]
     downconvert_16_to_8: bool = False
 
 
-def select_codec_profile(
-    *, dtype: np.dtype, codec: str, crf: int | None, force: bool
-) -> CodecProfile:
+def select_codec_profile(*, dtype: np.dtype, codec: str, crf: int | None, force: bool) -> CodecProfile:
     if dtype.kind != "u" or dtype.itemsize not in (1, 2):
         raise ValueError(
             f"unsupported dtype {dtype}; only uint8/uint16 grayscale TIFF sources are supported"
@@ -45,6 +44,11 @@ def select_codec_profile(
             container_ext=".mp4",
             ffmpeg_video_codec="libx265",
             pix_fmt="gray",
+            # Encoding monochrome HEVC directly (4:0:0 chroma) forces the "Rext"
+            # profile, which QuickTime and most hardware decoders (incl. Apple
+            # VideoToolbox) refuse to open. yuv420p keeps the Main profile, at
+            # near-zero extra cost since the added chroma plane is constant.
+            encode_pix_fmt="yuv420p",
             extra_args=["-crf", str(crf if crf is not None else DEFAULT_LOSSY_CRF)],
             # forcing a 16-bit source through this 8-bit pix_fmt requires actually
             # truncating each frame's bit depth, or ffmpeg's declared frame byte-size
@@ -54,10 +58,12 @@ def select_codec_profile(
         )
 
     if codec == "lossless":
+        pix_fmt = "gray16le" if is_16bit else "gray"
         return CodecProfile(
             container_ext=".mkv",
             ffmpeg_video_codec="ffv1",
-            pix_fmt="gray16le" if is_16bit else "gray",
+            pix_fmt=pix_fmt,
+            encode_pix_fmt=pix_fmt,
             extra_args=[],
         )
 
@@ -80,9 +86,7 @@ def resolve_fps(tif_dir: Path, explicit_fps: float | None) -> float:
     if camlog_path is not None:
         return parse_camlog(camlog_path).fps
 
-    raise ValueError(
-        f"no fps given and no .camlog sidecar found in {tif_dir}; pass --fps explicitly"
-    )
+    raise ValueError(f"no fps given and no .camlog sidecar found in {tif_dir}; pass --fps explicitly")
 
 
 def check_binaries_available() -> None:
@@ -100,9 +104,7 @@ class EncodeResult:
     frame_count_written: int
 
 
-def _build_ffmpeg_cmd(
-    *, width: int, height: int, fps: float, profile: CodecProfile, output: Path
-) -> list[str]:
+def _build_ffmpeg_cmd(*, width: int, height: int, fps: float, profile: CodecProfile, output: Path) -> list[str]:
     return [
         "ffmpeg",
         "-y",
@@ -120,19 +122,19 @@ def _build_ffmpeg_cmd(
         profile.ffmpeg_video_codec,
         *profile.extra_args,
         "-pix_fmt",
-        profile.pix_fmt,
+        profile.encode_pix_fmt,
         str(output),
     ]
 
 
 def run_encode(
-    tif_dir: Path,
-    output: Path,
-    *,
-    fps: float | None = None,
-    codec: str = "lossy",
-    crf: int | None = None,
-    force: bool = False,
+        tif_dir: Path,
+        output: Path,
+        *,
+        fps: float | None = None,
+        codec: str = "lossy",
+        crf: int | None = None,
+        force: bool = False,
 ) -> EncodeResult:
     check_binaries_available()
 

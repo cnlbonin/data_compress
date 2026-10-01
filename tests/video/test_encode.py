@@ -1,4 +1,5 @@
 import shutil
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -28,6 +29,17 @@ def test_select_codec_profile_lossy_8bit_defaults_to_libx265_mp4() -> None:
     assert profile.pix_fmt == "gray"
     assert "-crf" in profile.extra_args
     assert "18" in profile.extra_args
+
+
+def test_select_codec_profile_lossy_encodes_as_yuv420p_for_player_compatibility() -> None:
+    # Encoding monochrome HEVC directly (pix_fmt=gray, 4:0:0 chroma) forces the
+    # "Rext" profile, which QuickTime and most hardware decoders (incl. Apple
+    # VideoToolbox) refuse to open. yuv420p keeps the Main profile (broadly
+    # playable) at near-zero extra cost, since the added chroma plane is constant.
+    profile = select_codec_profile(dtype=np.dtype(np.uint8), codec="lossy", crf=None, force=False)
+
+    assert profile.pix_fmt == "gray"  # raw bytes we actually write to stdin
+    assert profile.encode_pix_fmt == "yuv420p"  # what we ask the encoder to produce
 
 
 def test_select_codec_profile_lossy_16bit_without_force_raises() -> None:
@@ -114,6 +126,38 @@ def test_check_binaries_available_passes_when_present(monkeypatch: pytest.Monkey
     monkeypatch.setattr("shutil.which", lambda name: f"/usr/bin/{name}")
 
     check_binaries_available()
+
+
+def _ffprobe_video_profile(path: Path) -> str:
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=profile",
+            "-of",
+            "csv=p=0",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+@requires_ffmpeg
+def test_run_encode_lossy_produces_main_profile_not_rext(tmp_path: Path) -> None:
+    frames = np.stack([np.full((64, 64), i, dtype=np.uint8) for i in range(5)])
+    tifffile.imwrite(tmp_path / "run_0000.tif", frames, photometric="minisblack")
+
+    output = tmp_path / "out.mp4"
+    run_encode(tmp_path, output, fps=10.0, codec="lossy")
+
+    assert _ffprobe_video_profile(output) == "Main"
 
 
 @requires_ffmpeg
