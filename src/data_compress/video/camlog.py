@@ -28,6 +28,11 @@ def parse_camlog(path: Path) -> CamlogInfo:
         )
 
     duration = timestamps[-1] - timestamps[0]
+    if duration <= 0:
+        raise ValueError(
+            f"camlog {path} timestamps are non-increasing "
+            f"(first={timestamps[0]}, last={timestamps[-1]}); cannot derive fps"
+        )
     fps = (frame_count - 1) / duration
     return CamlogInfo(frame_count=frame_count, fps=fps)
 

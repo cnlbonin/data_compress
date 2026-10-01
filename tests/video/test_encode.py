@@ -39,6 +39,19 @@ def test_select_codec_profile_lossy_16bit_with_force_succeeds() -> None:
     profile = select_codec_profile(dtype=np.dtype(np.uint16), codec="lossy", crf=None, force=True)
 
     assert profile.ffmpeg_video_codec == "libx265"
+    assert profile.pix_fmt == "gray"
+    assert profile.downconvert_16_to_8 is True
+
+
+def test_select_codec_profile_lossy_8bit_does_not_downconvert() -> None:
+    profile = select_codec_profile(dtype=np.dtype(np.uint8), codec="lossy", crf=None, force=False)
+
+    assert profile.downconvert_16_to_8 is False
+
+
+def test_select_codec_profile_rejects_unsupported_dtype() -> None:
+    with pytest.raises(ValueError, match="unsupported dtype"):
+        select_codec_profile(dtype=np.dtype(np.float32), codec="lossy", crf=None, force=False)
 
 
 def test_select_codec_profile_lossless_16bit_uses_ffv1_mkv() -> None:
@@ -117,6 +130,39 @@ def test_run_encode_writes_video_with_matching_frame_count(tmp_path: Path) -> No
     assert result.frame_count_written == n_frames
     assert output.exists()
     assert verify_frame_count(output) == n_frames
+
+
+@requires_ffmpeg
+def test_run_encode_lossy_16bit_with_force_writes_correct_frame_count(tmp_path: Path) -> None:
+    n_frames = 5
+    frames = np.stack(
+        [np.full((64, 64), i * 1000, dtype=np.uint16) for i in range(n_frames)]
+    )
+    tifffile.imwrite(tmp_path / "run_0000.tif", frames, photometric="minisblack")
+
+    output = tmp_path / "out.mp4"
+    result = run_encode(tmp_path, output, fps=10.0, codec="lossy", force=True)
+
+    assert result.frame_count_written == n_frames
+    assert verify_frame_count(output) == n_frames
+
+
+@requires_ffmpeg
+def test_run_encode_reports_clean_error_when_ffmpeg_dies_mid_stream(tmp_path: Path) -> None:
+    # An image this small makes libx265 refuse to open the encoder and exit almost
+    # immediately. Writing enough frames to exceed the OS pipe buffer guarantees we
+    # keep writing to stdin after ffmpeg has already exited and closed its end —
+    # this must surface as a clean RuntimeError, not a raw BrokenPipeError, and must
+    # not leave the ffmpeg child process running.
+    n_frames = 20_000
+    frames = np.stack(
+        [np.full((4, 6), i % 256, dtype=np.uint8) for i in range(n_frames)]
+    )
+    tifffile.imwrite(tmp_path / "run_0000.tif", frames, photometric="minisblack")
+
+    output = tmp_path / "out.mp4"
+    with pytest.raises(RuntimeError, match="ffmpeg"):
+        run_encode(tmp_path, output, fps=10.0, codec="lossy")
 
 
 @requires_ffmpeg

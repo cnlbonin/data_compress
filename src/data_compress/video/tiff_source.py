@@ -39,11 +39,16 @@ def scan_tiff_dir(tif_dir: Path) -> TiffStackInfo:
     dtype: np.dtype | None = None
     for file in files:
         with tifffile.TiffFile(file) as tif:
-            frame_count += len(tif.pages)
-            if shape is None:
-                first_page = tif.pages[0]
-                shape = first_page.shape
-                dtype = first_page.dtype
+            for page in tif.pages:
+                frame_count += 1
+                if shape is None:
+                    shape = page.shape
+                    dtype = page.dtype
+                elif page.shape != shape or page.dtype != dtype:
+                    raise ValueError(
+                        f"inconsistent frame shape/dtype in {file.name} (frame {frame_count}): "
+                        f"expected shape={shape} dtype={dtype}, got shape={page.shape} dtype={page.dtype}"
+                    )
 
     assert shape is not None and dtype is not None
     return TiffStackInfo(files=files, frame_count=frame_count, shape=shape, dtype=dtype)

@@ -28,6 +28,15 @@ def test_parse_camlog_computes_fps_and_frame_count(tmp_path: Path) -> None:
     assert info.fps == pytest.approx(30.0, rel=1e-3)
 
 
+def test_parse_camlog_raises_on_non_increasing_timestamps(tmp_path: Path) -> None:
+    camlog_path = tmp_path / "run.camlog"
+    # All frames share the same timestamp -> zero duration, fps undefined.
+    _write_camlog(camlog_path, [(1, 0.0), (2, 0.0), (3, 0.0)])
+
+    with pytest.raises(ValueError, match="non-increasing"):
+        parse_camlog(camlog_path)
+
+
 def test_parse_camlog_raises_on_single_frame(tmp_path: Path) -> None:
     camlog_path = tmp_path / "run.camlog"
     _write_camlog(camlog_path, [(1, 0.0)])

@@ -23,11 +23,16 @@ class CodecProfile:
     ffmpeg_video_codec: str
     pix_fmt: str
     extra_args: list[str]
+    downconvert_16_to_8: bool = False
 
 
 def select_codec_profile(
     *, dtype: np.dtype, codec: str, crf: int | None, force: bool
 ) -> CodecProfile:
+    if dtype.kind != "u" or dtype.itemsize not in (1, 2):
+        raise ValueError(
+            f"unsupported dtype {dtype}; only uint8/uint16 grayscale TIFF sources are supported"
+        )
     is_16bit = dtype.itemsize == 2
 
     if codec == "lossy":
@@ -41,6 +46,11 @@ def select_codec_profile(
             ffmpeg_video_codec="libx265",
             pix_fmt="gray",
             extra_args=["-crf", str(crf if crf is not None else DEFAULT_LOSSY_CRF)],
+            # forcing a 16-bit source through this 8-bit pix_fmt requires actually
+            # truncating each frame's bit depth, or ffmpeg's declared frame byte-size
+            # (1 byte/px) desyncs from the raw stream we send (2 bytes/px) and it
+            # silently decodes garbage as twice as many frames.
+            downconvert_16_to_8=is_16bit,
         )
 
     if codec == "lossless":
@@ -144,10 +154,25 @@ def run_encode(
         assert proc.stdin is not None
 
         frame_count_written = 0
-        for frame in iter_frames(tif_dir):
-            proc.stdin.write(frame.tobytes())
-            frame_count_written += 1
-        proc.stdin.close()
+        try:
+            for frame in iter_frames(tif_dir):
+                if profile.downconvert_16_to_8:
+                    frame = (frame >> 8).astype(np.uint8)
+                proc.stdin.write(frame.tobytes())
+                frame_count_written += 1
+            proc.stdin.close()
+        except Exception as exc:
+            # ffmpeg may have already died (e.g. rejected the encoder params) while
+            # we were still writing frames, surfacing as a raw BrokenPipeError here.
+            # Make sure the process is actually gone before reporting a clean error.
+            proc.kill()
+            proc.wait()
+            stderr_file.seek(0)
+            raise RuntimeError(
+                f"writing frames to ffmpeg failed: {exc}\n"
+                f"ffmpeg stderr:\n{stderr_file.read().decode(errors='replace')}"
+            ) from exc
+
         proc.wait()
 
         if proc.returncode != 0:

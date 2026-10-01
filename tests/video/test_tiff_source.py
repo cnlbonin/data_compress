@@ -45,6 +45,22 @@ def test_scan_tiff_dir_sorts_files_naturally_not_lexicographically(tmp_path: Pat
     assert [f.name for f in info.files] == ["file_1.tif", "file_2.tif", "file_10.tif"]
 
 
+def test_scan_tiff_dir_raises_on_inconsistent_shape_across_files(tmp_path: Path) -> None:
+    _write_stack(tmp_path / "run_00000000.tif", n_pages=2, value_start=0, shape=(4, 5))
+    _write_stack(tmp_path / "run_00000001.tif", n_pages=2, value_start=0, shape=(8, 10))
+
+    with pytest.raises(ValueError, match="inconsistent"):
+        scan_tiff_dir(tmp_path)
+
+
+def test_scan_tiff_dir_raises_on_inconsistent_dtype_across_files(tmp_path: Path) -> None:
+    _write_stack(tmp_path / "run_00000000.tif", n_pages=2, value_start=0, dtype=np.uint8)
+    _write_stack(tmp_path / "run_00000001.tif", n_pages=2, value_start=0, dtype=np.uint16)
+
+    with pytest.raises(ValueError, match="inconsistent"):
+        scan_tiff_dir(tmp_path)
+
+
 def test_iter_frames_yields_frames_in_order_across_files(tmp_path: Path) -> None:
     _write_stack(tmp_path / "run_00000000.tif", n_pages=2, value_start=0)
     _write_stack(tmp_path / "run_00000001.tif", n_pages=2, value_start=10)
