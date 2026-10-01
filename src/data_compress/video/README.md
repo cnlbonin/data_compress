@@ -17,10 +17,7 @@ You need Python ≥ 3.11 and `ffmpeg` (which includes `ffprobe`).
 
 ### Option A — uv (recommended)
 
-Install [uv](https://docs.astral.sh/uv/) and ffmpeg
-(Windows: `winget install --id astral-sh.uv -e` and
-`winget install --id Gyan.FFmpeg -e`, then reopen Git Bash; macOS:
-`brew install uv ffmpeg`), then:
+Install [uv](https://docs.astral.sh/uv/) and ffmpeg, then:
 
 ```bash
 cd /c/path/to/data_compress
