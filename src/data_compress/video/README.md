@@ -8,48 +8,51 @@ On real facecam data (644×484, 8-bit, ~30 fps) the default lossy mode gave
 **~48x** smaller files (159.7 MB of TIFF → 3.3 MB of mp4), with decoded frames
 differing from the source by ~1 gray level on average.
 
-## Requirements
+## Install
 
-Examples below use Windows PowerShell, since most acquisition PCs run Windows.
-macOS/Linux commands are given where they differ.
+All commands in this README are bash. On Windows (where most acquisition PCs
+are), run them in **Git Bash**; they work unchanged on macOS/Linux.
 
-1. Install [uv](https://docs.astral.sh/uv/) and ffmpeg (which includes `ffprobe`):
+You need Python ≥ 3.11 and `ffmpeg` (which includes `ffprobe`). Pick one:
 
-   ```powershell
-   winget install --id astral-sh.uv -e
-   winget install --id Gyan.FFmpeg -e
-   ```
+### Option A — conda (installs ffmpeg for you)
 
-   Open a **new** terminal afterwards so both are on `PATH`, then check with
-   `ffmpeg -version`. (macOS: `brew install uv ffmpeg`.)
+```bash
+conda create -n data-compress -c conda-forge python=3.11 ffmpeg
+conda activate data-compress
+cd /c/path/to/data_compress
+pip install .
+data-compress -h
+```
 
-2. Install the CLI. Either run it from the repo folder:
+If `conda activate` doesn't work in Git Bash, run `conda init bash` once and
+reopen Git Bash (or use the Anaconda Prompt instead). After pulling new code,
+rerun `pip install .`.
 
-   ```powershell
-   cd C:\path\to\data_compress
-   uv sync
-   uv run data-compress -h
-   ```
+### Option B — uv
 
-   or install it once as a command usable from any folder:
+Install [uv](https://docs.astral.sh/uv/) and ffmpeg yourself
+(Windows: `winget install --id astral-sh.uv -e` and
+`winget install --id Gyan.FFmpeg -e`, then reopen Git Bash; macOS:
+`brew install uv ffmpeg`), then:
 
-   ```powershell
-   cd C:\path\to\data_compress
-   uv tool install .
-   data-compress -h
-   ```
+```bash
+cd /c/path/to/data_compress
+uv tool install .
+data-compress -h
+```
 
-   If `data-compress` is then "not recognized", run `uv tool update-shell` and
-   open a new terminal. After pulling new code, rerun `uv tool install . --reinstall`.
+If `data-compress` is then "command not found", run `uv tool update-shell` and
+reopen the terminal. After pulling new code, rerun `uv tool install . --reinstall`.
 
-   The examples below assume the second option; with the first, prefix them with `uv run`.
+Check ffmpeg is found with `ffmpeg -version`.
 
 ## Input layout
 
 One directory per recording, containing:
 
 ```
-E:\data\facecam\250913_YW071__2P_YW\run00_152642_linear_combine\
+E:/data/facecam/250913_YW071__2P_YW/run00_152642_linear_combine/
   20250913_run000_00000000.tif   # each .tif may hold many frames (multi-page)
   20250913_run000_00000001.tif
   ...
@@ -66,26 +69,28 @@ E:\data\facecam\250913_YW071__2P_YW\run00_152642_linear_combine\
 
 ### `probe` — inspect without encoding
 
-```powershell
-data-compress video probe E:\data\facecam\250913_YW071__2P_YW\run00_152642_linear_combine
+```bash
+data-compress video probe E:/data/facecam/250913_YW071__2P_YW/run00_152642_linear_combine
 ```
 
-Put paths containing spaces in quotes: `"E:\my data\run00"`.
+In Git Bash, write Windows paths with forward slashes (`E:/data/...` or
+`/e/data/...`). Unquoted backslashes are treated as escape characters and the
+path gets mangled. Quote paths containing spaces: `"E:/my data/run00"`.
 
 Prints file count, frame count, resolution, dtype, and (if a `.camlog` exists)
 its frame count and fps. Shows a WARNING if the TIFF and camlog frame counts differ.
 
 ### `compress` — encode to a single video
 
-```powershell
+```bash
 # default: lossy H.265 -> .mp4
-data-compress video compress E:\data\facecam\run00 E:\data\facecam\run00.mp4
+data-compress video compress E:/data/facecam/run00 E:/data/facecam/run00.mp4
 
 # exact pixels: lossless FFV1 -> .mkv
-data-compress video compress E:\data\facecam\run00 E:\data\facecam\run00.mkv --codec lossless
+data-compress video compress E:/data/facecam/run00 E:/data/facecam/run00.mkv --codec lossless
 
 # no .camlog? give the frame rate explicitly
-data-compress video compress E:\data\facecam\run00 E:\data\facecam\run00.mp4 --fps 30
+data-compress video compress E:/data/facecam/run00 E:/data/facecam/run00.mp4 --fps 30
 ```
 
 | Option | Default | Meaning |
@@ -123,18 +128,8 @@ because lossy output is 8-bit and would discard the lower 8 bits.
 There is no built-in batch mode; loop over recordings in the shell. Each
 `runXX` folder becomes `runXX.mp4` next to it.
 
-PowerShell (Windows):
-
-```powershell
-Get-ChildItem -Directory E:\data\facecam\250913_YW071__2P_YW\run* | ForEach-Object {
-    data-compress video compress $_.FullName "$($_.FullName).mp4"
-}
-```
-
-bash (macOS/Linux):
-
 ```bash
-for d in /path/to/session/run*/; do
+for d in E:/data/facecam/250913_YW071__2P_YW/run*/; do
   data-compress video compress "$d" "${d%/}.mp4"
 done
 ```

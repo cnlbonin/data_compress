@@ -5,27 +5,25 @@ compromising later analysis.
 
 ## Install
 
-Requires [uv](https://docs.astral.sh/uv/) and `ffmpeg`/`ffprobe` on `PATH`.
+Needs Python ≥ 3.11 and `ffmpeg`. Commands are bash; on Windows use Git Bash.
 
-Windows (PowerShell):
-
-```powershell
-winget install --id astral-sh.uv -e
-winget install --id Gyan.FFmpeg -e
-# open a new terminal, then from the repo folder:
-uv tool install .
-data-compress -h
-```
-
-macOS:
+With conda (installs ffmpeg too):
 
 ```bash
-brew install uv ffmpeg
+conda create -n data-compress -c conda-forge python=3.11 ffmpeg
+conda activate data-compress
+pip install .
+data-compress -h
+```
+
+Or with [uv](https://docs.astral.sh/uv/), after installing ffmpeg yourself:
+
+```bash
 uv tool install .
 data-compress -h
 ```
 
-See the [video README](src/data_compress/video/README.md) for details.
+See the [video README](src/data_compress/video/README.md#install) for details.
 
 ## Modules
 
@@ -37,4 +35,6 @@ See the [video README](src/data_compress/video/README.md) for details.
 
 ```bash
 uv run pytest
+# or, in a conda env:
+pip install -e . pytest && pytest
 ```
