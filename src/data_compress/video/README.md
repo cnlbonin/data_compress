@@ -13,9 +13,28 @@ differing from the source by ~1 gray level on average.
 All commands in this README are bash. On Windows (where most acquisition PCs
 are), run them in **Git Bash**; they work unchanged on macOS/Linux.
 
-You need Python ≥ 3.11 and `ffmpeg` (which includes `ffprobe`). Pick one:
+You need Python ≥ 3.11 and `ffmpeg` (which includes `ffprobe`).
 
-### Option A — conda (installs ffmpeg for you)
+### Option A — uv (recommended)
+
+Install [uv](https://docs.astral.sh/uv/) and ffmpeg
+(Windows: `winget install --id astral-sh.uv -e` and
+`winget install --id Gyan.FFmpeg -e`, then reopen Git Bash; macOS:
+`brew install uv ffmpeg`), then:
+
+```bash
+cd /c/path/to/data_compress
+uv tool install .
+data-compress -h
+```
+
+uv fetches a suitable Python itself and keeps the tool in its own isolated
+environment, so it can't clash with other Python setups on the acquisition PC.
+
+If `data-compress` is then "command not found", run `uv tool update-shell` and
+reopen the terminal. After pulling new code, rerun `uv tool install . --reinstall`.
+
+### Option B — conda (installs ffmpeg for you)
 
 ```bash
 conda create -n data-compress -c conda-forge python=3.11 ffmpeg
@@ -29,23 +48,7 @@ If `conda activate` doesn't work in Git Bash, run `conda init bash` once and
 reopen Git Bash (or use the Anaconda Prompt instead). After pulling new code,
 rerun `pip install .`.
 
-### Option B — uv
-
-Install [uv](https://docs.astral.sh/uv/) and ffmpeg yourself
-(Windows: `winget install --id astral-sh.uv -e` and
-`winget install --id Gyan.FFmpeg -e`, then reopen Git Bash; macOS:
-`brew install uv ffmpeg`), then:
-
-```bash
-cd /c/path/to/data_compress
-uv tool install .
-data-compress -h
-```
-
-If `data-compress` is then "command not found", run `uv tool update-shell` and
-reopen the terminal. After pulling new code, rerun `uv tool install . --reinstall`.
-
-Check ffmpeg is found with `ffmpeg -version`.
+Either way, check ffmpeg is found with `ffmpeg -version`.
 
 ## Input layout
 

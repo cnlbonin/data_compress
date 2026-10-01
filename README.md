@@ -7,19 +7,19 @@ compromising later analysis.
 
 Needs Python ≥ 3.11 and `ffmpeg`. Commands are bash; on Windows use Git Bash.
 
-With conda (installs ffmpeg too):
+Recommended, with [uv](https://docs.astral.sh/uv/) (install ffmpeg separately):
+
+```bash
+uv tool install .
+data-compress -h
+```
+
+Or with conda (installs ffmpeg too):
 
 ```bash
 conda create -n data-compress -c conda-forge python=3.11 ffmpeg
 conda activate data-compress
 pip install .
-data-compress -h
-```
-
-Or with [uv](https://docs.astral.sh/uv/), after installing ffmpeg yourself:
-
-```bash
-uv tool install .
 data-compress -h
 ```
 
