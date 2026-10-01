@@ -128,7 +128,7 @@ def test_check_binaries_available_passes_when_present(monkeypatch: pytest.Monkey
     check_binaries_available()
 
 
-def _ffprobe_video_profile(path: Path) -> str:
+def _ffprobe_stream_field(path: Path, field: str) -> str:
     result = subprocess.run(
         [
             "ffprobe",
@@ -137,7 +137,7 @@ def _ffprobe_video_profile(path: Path) -> str:
             "-select_streams",
             "v:0",
             "-show_entries",
-            "stream=profile",
+            f"stream={field}",
             "-of",
             "csv=p=0",
             str(path),
@@ -150,6 +150,18 @@ def _ffprobe_video_profile(path: Path) -> str:
 
 
 @requires_ffmpeg
+def test_run_encode_lossy_uses_hvc1_tag_for_apple_players(tmp_path: Path) -> None:
+    # QuickTime/QuickLook refuse HEVC tagged "hev1" (ffmpeg's default in mp4).
+    frames = np.stack([np.full((64, 64), i, dtype=np.uint8) for i in range(5)])
+    tifffile.imwrite(tmp_path / "run_0000.tif", frames, photometric="minisblack")
+
+    output = tmp_path / "out.mp4"
+    run_encode(tmp_path, output, fps=10.0, codec="lossy")
+
+    assert _ffprobe_stream_field(output, "codec_tag_string") == "hvc1"
+
+
+@requires_ffmpeg
 def test_run_encode_lossy_produces_main_profile_not_rext(tmp_path: Path) -> None:
     frames = np.stack([np.full((64, 64), i, dtype=np.uint8) for i in range(5)])
     tifffile.imwrite(tmp_path / "run_0000.tif", frames, photometric="minisblack")
@@ -157,7 +169,7 @@ def test_run_encode_lossy_produces_main_profile_not_rext(tmp_path: Path) -> None
     output = tmp_path / "out.mp4"
     run_encode(tmp_path, output, fps=10.0, codec="lossy")
 
-    assert _ffprobe_video_profile(output) == "Main"
+    assert _ffprobe_stream_field(output, "profile") == "Main"
 
 
 @requires_ffmpeg

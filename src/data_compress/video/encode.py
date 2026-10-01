@@ -49,7 +49,14 @@ def select_codec_profile(*, dtype: np.dtype, codec: str, crf: int | None, force:
             # VideoToolbox) refuse to open. yuv420p keeps the Main profile, at
             # near-zero extra cost since the added chroma plane is constant.
             encode_pix_fmt="yuv420p",
-            extra_args=["-crf", str(crf if crf is not None else DEFAULT_LOSSY_CRF)],
+            # Apple players (QuickTime/QuickLook) only accept HEVC-in-mp4 tagged hvc1;
+            # ffmpeg defaults to hev1.
+            extra_args=[
+                "-crf",
+                str(crf if crf is not None else DEFAULT_LOSSY_CRF),
+                "-tag:v",
+                "hvc1",
+            ],
             # forcing a 16-bit source through this 8-bit pix_fmt requires actually
             # truncating each frame's bit depth, or ffmpeg's declared frame byte-size
             # (1 byte/px) desyncs from the raw stream we send (2 bytes/px) and it
