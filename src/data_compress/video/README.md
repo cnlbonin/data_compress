@@ -10,15 +10,46 @@ differing from the source by ~1 gray level on average.
 
 ## Requirements
 
-- `ffmpeg` and `ffprobe` on `PATH` (e.g. `brew install ffmpeg`)
-- Install the CLI from the repo root: `uv sync`, then run it with `uv run data-compress ...`
+Examples below use Windows PowerShell, since most acquisition PCs run Windows.
+macOS/Linux commands are given where they differ.
+
+1. Install [uv](https://docs.astral.sh/uv/) and ffmpeg (which includes `ffprobe`):
+
+   ```powershell
+   winget install --id astral-sh.uv -e
+   winget install --id Gyan.FFmpeg -e
+   ```
+
+   Open a **new** terminal afterwards so both are on `PATH`, then check with
+   `ffmpeg -version`. (macOS: `brew install uv ffmpeg`.)
+
+2. Install the CLI. Either run it from the repo folder:
+
+   ```powershell
+   cd C:\path\to\data_compress
+   uv sync
+   uv run data-compress -h
+   ```
+
+   or install it once as a command usable from any folder:
+
+   ```powershell
+   cd C:\path\to\data_compress
+   uv tool install .
+   data-compress -h
+   ```
+
+   If `data-compress` is then "not recognized", run `uv tool update-shell` and
+   open a new terminal. After pulling new code, rerun `uv tool install . --reinstall`.
+
+   The examples below assume the second option; with the first, prefix them with `uv run`.
 
 ## Input layout
 
 One directory per recording, containing:
 
 ```
-run00_152642_linear_combine/
+E:\data\facecam\250913_YW071__2P_YW\run00_152642_linear_combine\
   20250913_run000_00000000.tif   # each .tif may hold many frames (multi-page)
   20250913_run000_00000001.tif
   ...
@@ -35,24 +66,26 @@ run00_152642_linear_combine/
 
 ### `probe` — inspect without encoding
 
-```bash
-data-compress video probe /path/to/run_dir
+```powershell
+data-compress video probe E:\data\facecam\250913_YW071__2P_YW\run00_152642_linear_combine
 ```
+
+Put paths containing spaces in quotes: `"E:\my data\run00"`.
 
 Prints file count, frame count, resolution, dtype, and (if a `.camlog` exists)
 its frame count and fps. Shows a WARNING if the TIFF and camlog frame counts differ.
 
 ### `compress` — encode to a single video
 
-```bash
+```powershell
 # default: lossy H.265 -> .mp4
-data-compress video compress /path/to/run_dir out.mp4
+data-compress video compress E:\data\facecam\run00 E:\data\facecam\run00.mp4
 
 # exact pixels: lossless FFV1 -> .mkv
-data-compress video compress /path/to/run_dir out.mkv --codec lossless
+data-compress video compress E:\data\facecam\run00 E:\data\facecam\run00.mkv --codec lossless
 
 # no .camlog? give the frame rate explicitly
-data-compress video compress /path/to/run_dir out.mp4 --fps 30
+data-compress video compress E:\data\facecam\run00 E:\data\facecam\run00.mp4 --fps 30
 ```
 
 | Option | Default | Meaning |
@@ -84,33 +117,32 @@ intensity-based analyses should use `lossless`.
 16-bit sources are refused on the lossy path unless you pass `--force`,
 because lossy output is 8-bit and would discard the lower 8 bits.
 
-## Opening the output
-
-- **QuickTime / Finder preview / VLC:** `.mp4` opens directly. `.mkv` (FFV1) needs VLC.
-- **Python:**
-
-  ```python
-  import cv2
-
-  cap = cv2.VideoCapture("out.mp4")
-  ok, frame = cap.read()                           # BGR, 3 identical channels
-  gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-  ```
-
-- **ImageJ:** plain ImageJ cannot decode H.264/H.265 or FFV1. In Fiji, enable the
-  **FFMPEG** update site (Help → Update → Manage update sites), restart, and use
-  File → Import → Movie (FFMPEG). H.265 support in that plugin may vary; test on
-  a small file first.
 
 ## Batch processing
 
-There is no built-in batch mode; loop over recordings in the shell:
+There is no built-in batch mode; loop over recordings in the shell. Each
+`runXX` folder becomes `runXX.mp4` next to it.
+
+PowerShell (Windows):
+
+```powershell
+Get-ChildItem -Directory E:\data\facecam\250913_YW071__2P_YW\run* | ForEach-Object {
+    data-compress video compress $_.FullName "$($_.FullName).mp4"
+}
+```
+
+bash (macOS/Linux):
 
 ```bash
 for d in /path/to/session/run*/; do
   data-compress video compress "$d" "${d%/}.mp4"
 done
 ```
+
+Encoding uses most of the CPU, so don't run it on an acquisition PC while a
+recording is in progress, where it could cause dropped frames. Compressing on
+the acquisition PC between sessions, before copying to the server, also cuts
+transfer time.
 
 ## Limitations
 

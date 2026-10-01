@@ -7,10 +7,25 @@ compromising later analysis.
 
 Requires [uv](https://docs.astral.sh/uv/) and `ffmpeg`/`ffprobe` on `PATH`.
 
-```bash
-uv sync
-uv run data-compress -h
+Windows (PowerShell):
+
+```powershell
+winget install --id astral-sh.uv -e
+winget install --id Gyan.FFmpeg -e
+# open a new terminal, then from the repo folder:
+uv tool install .
+data-compress -h
 ```
+
+macOS:
+
+```bash
+brew install uv ffmpeg
+uv tool install .
+data-compress -h
+```
+
+See the [video README](src/data_compress/video/README.md) for details.
 
 ## Modules
 
