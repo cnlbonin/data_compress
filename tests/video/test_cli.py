@@ -24,6 +24,21 @@ def test_probe_command_reports_frame_count_and_resolution(tmp_path: Path) -> Non
     assert "64x64" in result.stdout
 
 
+def test_video_app_supports_h_shorthand_for_help() -> None:
+    result = runner.invoke(app, ["-h"])
+
+    assert result.exit_code == 0
+    assert "probe" in result.stdout
+    assert "compress" in result.stdout
+
+
+def test_compress_subcommand_supports_h_shorthand_for_help() -> None:
+    result = runner.invoke(app, ["compress", "-h"])
+
+    assert result.exit_code == 0
+    assert "--codec" in result.stdout
+
+
 def test_probe_command_fails_on_missing_directory(tmp_path: Path) -> None:
     result = runner.invoke(app, ["probe", str(tmp_path / "does-not-exist")])
 

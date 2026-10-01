@@ -11,7 +11,10 @@ from rich.table import Table
 from data_compress.video.encode import run_encode, verify_frame_count
 from data_compress.video.probe import ProbeReport, build_probe_report
 
-app = typer.Typer(help="Inspect and compress behavioral-camera TIFF sequences.")
+app = typer.Typer(
+    help="Inspect and compress behavioral-camera TIFF sequences.",
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
 console = Console()
 
 TifDirArg = typer.Argument(..., exists=True, file_okay=False, dir_okay=True)
