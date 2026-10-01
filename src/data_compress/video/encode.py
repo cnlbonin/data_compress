@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+from tqdm import tqdm
 
 from data_compress.video.camlog import find_camlog, parse_camlog
 from data_compress.video.tiff_source import iter_frames, scan_tiff_dir
@@ -142,6 +143,7 @@ def run_encode(
         codec: str = "lossy",
         crf: int | None = None,
         force: bool = False,
+        show_progress: bool = False,
 ) -> EncodeResult:
     check_binaries_available()
 
@@ -163,14 +165,23 @@ def run_encode(
         assert proc.stdin is not None
 
         frame_count_written = 0
+        frames = tqdm(
+            iter_frames(tif_dir),
+            total=info.frame_count,
+            unit="frame",
+            desc="encoding",
+            disable=not show_progress,
+        )
         try:
-            for frame in iter_frames(tif_dir):
+            for frame in frames:
                 if profile.downconvert_16_to_8:
                     frame = (frame >> 8).astype(np.uint8)
                 proc.stdin.write(frame.tobytes())
                 frame_count_written += 1
+            frames.close()
             proc.stdin.close()
         except Exception as exc:
+            frames.close()
             # ffmpeg may have already died (e.g. rejected the encoder params) while
             # we were still writing frames, surfacing as a raw BrokenPipeError here.
             # Make sure the process is actually gone before reporting a clean error.

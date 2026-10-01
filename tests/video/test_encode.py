@@ -173,6 +173,30 @@ def test_run_encode_lossy_produces_main_profile_not_rext(tmp_path: Path) -> None
 
 
 @requires_ffmpeg
+def test_run_encode_shows_progress_bar_when_requested(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    frames = np.stack([np.full((64, 64), i, dtype=np.uint8) for i in range(5)])
+    tifffile.imwrite(tmp_path / "run_0000.tif", frames, photometric="minisblack")
+
+    run_encode(tmp_path, tmp_path / "out.mp4", fps=10.0, codec="lossy", show_progress=True)
+
+    assert "5/5" in capsys.readouterr().err
+
+
+@requires_ffmpeg
+def test_run_encode_is_silent_by_default(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    frames = np.stack([np.full((64, 64), i, dtype=np.uint8) for i in range(5)])
+    tifffile.imwrite(tmp_path / "run_0000.tif", frames, photometric="minisblack")
+
+    run_encode(tmp_path, tmp_path / "out.mp4", fps=10.0, codec="lossy")
+
+    assert capsys.readouterr().err == ""
+
+
+@requires_ffmpeg
 def test_run_encode_writes_video_with_matching_frame_count(tmp_path: Path) -> None:
     n_frames = 7
     frames = np.stack(

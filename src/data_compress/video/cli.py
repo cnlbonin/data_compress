@@ -66,12 +66,15 @@ def compress(
     _print_probe_report(report)
 
     try:
-        result = run_encode(tif_dir, output, fps=fps, codec=codec, crf=crf, force=force)
+        result = run_encode(
+            tif_dir, output, fps=fps, codec=codec, crf=crf, force=force, show_progress=True
+        )
     except (ValueError, RuntimeError) as exc:
         console.print(f"[bold red]Error:[/] {exc}")
         raise typer.Exit(code=1) from exc
 
-    actual = verify_frame_count(output)
+    with console.status("verifying frame count with ffprobe..."):
+        actual = verify_frame_count(output)
     if actual == result.frame_count_written:
         console.print(f"[bold green]PASS[/] wrote {actual} frames to {output}")
     else:
