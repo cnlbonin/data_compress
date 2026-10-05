@@ -18,3 +18,11 @@ def test_root_app_supports_h_shorthand_for_help() -> None:
 
     assert result.exit_code == 0
     assert "video" in result.stdout
+
+
+def test_root_app_registers_ephys_subcommand() -> None:
+    result = runner.invoke(app, ["ephys", "--help"])
+
+    assert result.exit_code == 0
+    assert "compress" in result.stdout
+    assert "decompress" in result.stdout

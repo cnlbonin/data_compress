@@ -1,4 +1,4 @@
-"""`data-compress video ...` commands: probe and compress TIFF sequences."""
+"""`dc video ...` commands: probe and compress TIFF sequences."""
 
 from __future__ import annotations
 

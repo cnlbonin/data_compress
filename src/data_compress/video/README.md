@@ -1,4 +1,4 @@
-# `data-compress video`
+# `dc video`
 
 Compress behavioral-camera recordings (eye/face cams) stored as TIFF frame
 sequences into a single video file, with checks that the compression doesn't
@@ -20,30 +20,29 @@ You need Python ≥ 3.11 and `ffmpeg` (which includes `ffprobe`).
 Install [uv](https://docs.astral.sh/uv/) and ffmpeg, then:
 
 ```bash
-cd /c/path/to/data_compress
-uv tool install .
-data-compress -h
+uv tool install git+https://github.com/cnlbonin/data_compress
+dc -h
 ```
 
 uv fetches a suitable Python itself and keeps the tool in its own isolated
 environment, so it can't clash with other Python setups on the acquisition PC.
+It installs straight from GitHub; no clone needed (Git Bash provides `git`).
 
-If `data-compress` is then "command not found", run `uv tool update-shell` and
-reopen the terminal. After pulling new code, rerun `uv tool install . --reinstall`.
+If `dc` is then "command not found", run `uv tool update-shell` and
+reopen the terminal. To update to the latest `main`, run `uv tool upgrade data-compress`.
 
 ### Option B — conda (installs ffmpeg for you)
 
 ```bash
 conda create -n data-compress -c conda-forge python=3.11 ffmpeg
 conda activate data-compress
-cd /c/path/to/data_compress
-pip install .
-data-compress -h
+pip install git+https://github.com/cnlbonin/data_compress
+dc -h
 ```
 
 If `conda activate` doesn't work in Git Bash, run `conda init bash` once and
-reopen Git Bash (or use the Anaconda Prompt instead). After pulling new code,
-rerun `pip install .`.
+reopen Git Bash (or use the Anaconda Prompt instead). To update,
+run `pip install --upgrade --force-reinstall --no-deps git+https://github.com/cnlbonin/data_compress`.
 
 Either way, check ffmpeg is found with `ffmpeg -version`.
 
@@ -70,7 +69,7 @@ E:/data/facecam/250913_YW071__2P_YW/run00_152642_linear_combine/
 ### `probe` — inspect without encoding
 
 ```bash
-data-compress video probe E:/data/facecam/250913_YW071__2P_YW/run00_152642_linear_combine
+dc video probe E:/data/facecam/250913_YW071__2P_YW/run00_152642_linear_combine
 ```
 
 In Git Bash, write Windows paths with forward slashes (`E:/data/...` or
@@ -84,13 +83,13 @@ its frame count and fps. Shows a WARNING if the TIFF and camlog frame counts dif
 
 ```bash
 # default: lossy H.265 -> .mp4
-data-compress video compress E:/data/facecam/run00 E:/data/facecam/run00.mp4
+dc video compress E:/data/facecam/run00 E:/data/facecam/run00.mp4
 
 # exact pixels: lossless FFV1 -> .mkv
-data-compress video compress E:/data/facecam/run00 E:/data/facecam/run00.mkv --codec lossless
+dc video compress E:/data/facecam/run00 E:/data/facecam/run00.mkv --codec lossless
 
 # no .camlog? give the frame rate explicitly
-data-compress video compress E:/data/facecam/run00 E:/data/facecam/run00.mp4 --fps 30
+dc video compress E:/data/facecam/run00 E:/data/facecam/run00.mp4 --fps 30
 ```
 
 | Option | Default | Meaning |
@@ -130,7 +129,7 @@ There is no built-in batch mode; loop over recordings in the shell. Each
 
 ```bash
 for d in E:/data/facecam/250913_YW071__2P_YW/run*/; do
-  data-compress video compress "$d" "${d%/}.mp4"
+  dc video compress "$d" "${d%/}.mp4"
 done
 ```
 

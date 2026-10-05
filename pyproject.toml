@@ -13,10 +13,12 @@ dependencies = [
     "tifffile>=2026.3.3",
     "tqdm>=4.70.1",
     "typer>=0.27.2",
+    "wavpack-numcodecs>=0.2.3",
+    "zarr>=3.1.6",
 ]
 
 [project.scripts]
-data-compress = "data_compress:main"
+dc = "data_compress:main"
 
 [build-system]
 requires = ["hatchling"]
