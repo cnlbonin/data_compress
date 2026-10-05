@@ -5,6 +5,7 @@ import pytest
 import zarr
 
 from data_compress.ephys.encode import (
+    _chunk_ranges,
     run_compress,
     run_decompress,
     validate_bps,
@@ -188,3 +189,69 @@ def test_decompress_preserves_crlf_meta_byte_for_byte(tmp_path: Path) -> None:
     run_decompress(out, restored)
 
     assert restored.with_suffix(".meta").read_bytes() == meta_path.read_bytes()
+
+
+@pytest.mark.parametrize(
+    ("n_chunks", "jobs"), [(0, 4), (1, 4), (3, 8), (4, 1), (100, 3), (1000, 8)]
+)
+def test_chunk_ranges_cover_every_chunk_once_in_order(n_chunks: int, jobs: int) -> None:
+    ranges = _chunk_ranges(n_chunks, jobs)
+
+    covered = [i for start, stop in ranges for i in range(start, stop)]
+    assert covered == list(range(n_chunks))
+    assert all(start < stop for start, stop in ranges)
+
+
+def test_parallel_compress_matches_serial(tmp_path: Path) -> None:
+    traces, bin_path = _recording(tmp_path, n_samples=7300)
+
+    run_compress(bin_path, tmp_path / "serial.zarr", jobs=1)
+    run_compress(bin_path, tmp_path / "parallel.zarr", jobs=3)
+
+    serial = zarr.open_group(tmp_path / "serial.zarr", mode="r")
+    parallel = zarr.open_group(tmp_path / "parallel.zarr", mode="r")
+    np.testing.assert_array_equal(parallel["traces_seg0"][:], traces[:, :16])
+    np.testing.assert_array_equal(parallel["sync_seg0"][:], traces[:, 16:])
+    np.testing.assert_array_equal(parallel["traces_seg0"][:], serial["traces_seg0"][:])
+
+
+def test_parallel_verify_matches_serial(tmp_path: Path) -> None:
+    _, bin_path = _recording(tmp_path, n_samples=7300)
+    out = tmp_path / "rec.zarr"
+    run_compress(bin_path, out, bps=3, jobs=2)
+
+    serial = verify(bin_path, out, jobs=1)
+    parallel = verify(bin_path, out, jobs=3)
+
+    assert parallel.passed == serial.passed
+    assert parallel.sync_exact == serial.sync_exact
+    assert parallel.max_abs_error == serial.max_abs_error
+    assert parallel.relative_rms_error == pytest.approx(serial.relative_rms_error)
+
+
+def test_parallel_verify_still_detects_a_bad_chunk(tmp_path: Path) -> None:
+    _, bin_path = _recording(tmp_path, n_samples=7300)
+    out = tmp_path / "rec.zarr"
+    run_compress(bin_path, out, jobs=2)
+    root = zarr.open_group(out, mode="r+")
+    root["traces_seg0"][6500, 3] = root["traces_seg0"][6500, 3] + 1
+
+    assert not verify(bin_path, out, jobs=3).passed
+
+
+def test_parallel_decompress_restores_identical_bin(tmp_path: Path) -> None:
+    _, bin_path = _recording(tmp_path, n_samples=7300)
+    out = tmp_path / "rec.zarr"
+    run_compress(bin_path, out, jobs=2)
+    restored = tmp_path / "restored" / bin_path.name
+
+    run_decompress(out, restored, jobs=3)
+
+    assert restored.read_bytes() == bin_path.read_bytes()
+
+
+def test_jobs_must_be_positive(tmp_path: Path) -> None:
+    _, bin_path = _recording(tmp_path)
+
+    with pytest.raises(ValueError, match="jobs"):
+        run_compress(bin_path, tmp_path / "rec.zarr", jobs=0)

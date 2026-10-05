@@ -157,3 +157,19 @@ def test_verify_command_errors_on_non_compressed_dir(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "Error" in result.stdout
+
+
+def test_compress_accepts_jobs_and_round_trips(tmp_path: Path) -> None:
+    bin_path = _bin(tmp_path)
+    out = tmp_path / "rec.zarr"
+
+    result = runner.invoke(app, ["compress", str(bin_path), str(out), "--jobs", "2"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "PASS" in result.stdout
+
+
+def test_compress_rejects_zero_jobs(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["compress", str(_bin(tmp_path)), str(tmp_path / "rec.zarr"), "--jobs", "0"])
+
+    assert result.exit_code != 0

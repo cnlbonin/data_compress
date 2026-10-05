@@ -62,7 +62,7 @@ conda users: see the [top-level install](../../../README.md#install) and run
 ### `probe`: inspect without writing
 
 ```bash
-dc ephys probe E:/data/np/run_g0/run_g0_imec0/run_g0_t0.imec0.ap.bin
+dc ephys probe .../run_g0_t0.imec0.ap.bin
 ```
 
 Shows the stream type, neural and sync channel counts, sample rate, duration and
@@ -85,6 +85,11 @@ dc ephys compress run_g0_t0.imec0.ap.bin run_g0_t0.imec0.ap.zarr --bps 3
 | `--level` | 3 | WavPack effort 1–4: higher is smaller but slower |
 | `--overwrite` | off | replace an existing output |
 | `--no-verify` | off | skip the read-back check |
+| `--jobs` / `-j` | CPU count, max 8 | worker processes for compress, verify and decompress |
+
+The work is split into 1-s chunk ranges that run in parallel worker processes, so
+`compress` and `verify` scale with `--jobs` (about 8x faster at 8 jobs on a 60-s AP recording).
+The output does not depend on `--jobs`.
 
 The `.meta` sidecar must sit next to the `.bin`. After writing, the output is
 decoded again and compared with the source:
@@ -101,6 +106,8 @@ TTL bits are what you align behaviour and imaging to. Lossy coding would corrupt
 ```bash
 dc ephys verify run_g0_t0.imec0.ap.bin run_g0_t0.imec0.ap.zarr
 ```
+
+It accepts `--jobs` too.
 
 Runs the same read-back check as `compress`, for an output written earlier, e.g.
 after copying it to the server and before deleting the raw `.bin`. It prints the

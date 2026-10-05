@@ -5,14 +5,22 @@ wavpack-numcodecs, 1-s chunks over all channels, lossless by default and lossy
 only at an explicit bits-per-sample (bps) target. The output layout matches
 SpikeInterface's Zarr recordings (`traces_seg0`, `channel_ids`,
 `sampling_frequency`) so it can be loaded later with `spikeinterface.read_zarr`.
+
+Compress, verify and restore work on contiguous ranges of 1-s chunks. Each range
+runs in its own worker process (WavPack encoding holds the GIL, so threads do not
+help). Every range covers whole chunks, so workers never write to the same Zarr
+chunk or the same byte range of the restored `.bin`.
 """
 
 from __future__ import annotations
 
+import os
 import shutil
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
+from typing import Any, Callable
 
 import numpy as np
 import zarr
@@ -25,11 +33,25 @@ DEFAULT_LEVEL = 3
 MIN_BPS = 2.25  # lowest bps WavPack's lossy mode supports
 MAX_BPS = 16.0  # int16 data: at 16 bps "lossy" is no smaller than the raw samples
 CHUNK_SECONDS = 1.0
+MAX_DEFAULT_JOBS = 8
+TASKS_PER_JOB = 4  # several smaller tasks per worker keep all workers busy to the end
 
 
 def validate_bps(bps: float | None) -> None:
     if bps is not None and not MIN_BPS <= bps < MAX_BPS:
         raise ValueError(f"bps must be in [{MIN_BPS}, {MAX_BPS}) for lossy WavPack, got {bps}")
+
+
+def default_jobs() -> int:
+    return max(1, min(os.cpu_count() or 1, MAX_DEFAULT_JOBS))
+
+
+def _resolve_jobs(jobs: int | None) -> int:
+    if jobs is None:
+        return default_jobs()
+    if jobs < 1:
+        raise ValueError(f"jobs must be at least 1, got {jobs}")
+    return jobs
 
 
 @dataclass(frozen=True)
@@ -48,10 +70,55 @@ def _dir_size(path: Path) -> int:
     return sum(p.stat().st_size for p in path.rglob("*") if p.is_file())
 
 
-def _iter_chunks(n_samples: int, chunk: int, *, desc: str, show_progress: bool):
-    starts = range(0, n_samples, chunk)
-    for start in tqdm(starts, unit="chunk", desc=desc, disable=not show_progress):
-        yield start, min(start + chunk, n_samples)
+def _n_chunks(n_samples: int, chunk: int) -> int:
+    return -(-n_samples // chunk)
+
+
+def _chunk_bounds(index: int, chunk: int, n_samples: int) -> tuple[int, int]:
+    start = index * chunk
+    return start, min(start + chunk, n_samples)
+
+
+def _chunk_ranges(n_chunks: int, jobs: int) -> list[tuple[int, int]]:
+    """Split chunk indices [0, n_chunks) into contiguous [start, stop) ranges."""
+    n_tasks = min(n_chunks, jobs * TASKS_PER_JOB)
+    edges = np.linspace(0, n_chunks, n_tasks + 1).round().astype(int)
+    return [(int(a), int(b)) for a, b in zip(edges[:-1], edges[1:]) if b > a]
+
+
+def _map_chunk_ranges(
+        worker: Callable[..., Any],
+        n_chunks: int,
+        *,
+        jobs: int,
+        desc: str,
+        show_progress: bool,
+        **kwargs: Any,
+) -> list[Any]:
+    """Call `worker(start_chunk, stop_chunk, **kwargs)` on each range; results follow range order."""
+    ranges = _chunk_ranges(n_chunks, jobs)
+    bar = tqdm(total=n_chunks, unit="chunk", desc=desc, disable=not show_progress)
+    try:
+        if jobs == 1:
+            results = []
+            for start, stop in ranges:
+                results.append(worker(start, stop, **kwargs))
+                bar.update(stop - start)
+            return results
+        with ProcessPoolExecutor(max_workers=jobs) as pool:
+            futures = {pool.submit(worker, start, stop, **kwargs): (start, stop) for start, stop in ranges}
+            try:
+                for future in as_completed(futures):
+                    future.result()  # re-raises the worker's error
+                    start, stop = futures[future]
+                    bar.update(stop - start)
+            except BaseException:
+                for future in futures:
+                    future.cancel()
+                raise
+            return [future.result() for future in futures]
+    finally:
+        bar.close()
 
 
 def _prepare_output(path: Path, overwrite: bool) -> None:
@@ -64,6 +131,21 @@ def _prepare_output(path: Path, overwrite: bool) -> None:
             path.unlink()
 
 
+def _compress_chunks(start_chunk: int, stop_chunk: int, *, bin_path: Path, output: Path, chunk: int) -> None:
+    meta = parse_meta(find_meta(bin_path))
+    data = open_bin(bin_path, meta)
+    n_neural = meta.n_neural_chans
+    root = zarr.open_group(output, mode="r+")
+    traces = root["traces_seg0"]
+    sync = root["sync_seg0"] if "sync_seg0" in root else None
+    for index in range(start_chunk, stop_chunk):
+        start, stop = _chunk_bounds(index, chunk, data.shape[0])
+        block = np.asarray(data[start:stop])
+        traces[start:stop] = block[:, :n_neural]
+        if sync is not None:
+            sync[start:stop] = block[:, n_neural:]
+
+
 def run_compress(
         bin_path: Path,
         output: Path,
@@ -72,8 +154,10 @@ def run_compress(
         level: int = DEFAULT_LEVEL,
         overwrite: bool = False,
         show_progress: bool = False,
+        jobs: int | None = None,
 ) -> CompressResult:
     validate_bps(bps)
+    jobs = _resolve_jobs(jobs)
     if output.suffix.lower() != ".zarr":
         raise ValueError(f"output {output} must have a .zarr extension")
 
@@ -105,28 +189,33 @@ def run_compress(
             }
         )
         root.create_array("channel_ids", data=np.arange(n_neural))
-        traces = root.create_array(
+        root.create_array(
             "traces_seg0",
             shape=(n_samples, n_neural),
             chunks=(chunk, n_neural),
             dtype=SAMPLE_DTYPE,
             compressors=WavPack(level=level, bps=bps),
         )
-        sync = None
         if meta.n_sync_chans:
-            sync = root.create_array(
+            root.create_array(
                 "sync_seg0",
                 shape=(n_samples, meta.n_sync_chans),
                 chunks=(chunk, meta.n_sync_chans),
                 dtype=SAMPLE_DTYPE,
                 compressors=WavPack(level=level),  # TTL bits: always lossless
             )
+        del root  # workers reopen the group; the arrays are already created
 
-        for start, stop in _iter_chunks(n_samples, chunk, desc="compressing", show_progress=show_progress):
-            block = np.asarray(data[start:stop])
-            traces[start:stop] = block[:, :n_neural]
-            if sync is not None:
-                sync[start:stop] = block[:, n_neural:]
+        _map_chunk_ranges(
+            _compress_chunks,
+            _n_chunks(n_samples, chunk),
+            jobs=jobs,
+            desc="compressing",
+            show_progress=show_progress,
+            bin_path=bin_path,
+            output=output,
+            chunk=chunk,
+        )
     except BaseException:
         shutil.rmtree(output, ignore_errors=True)
         raise
@@ -160,6 +249,15 @@ class VerifyResult:
         return self.exact if self.lossless else self.sync_exact
 
 
+@dataclass(frozen=True)
+class _VerifyPartial:
+    max_abs_error: int
+    err_sq: float
+    sums: np.ndarray
+    sum_sq: np.ndarray
+    sync_exact: bool
+
+
 def _open_compressed(output: Path) -> zarr.Group:
     try:
         root = zarr.open_group(output, mode="r")
@@ -170,26 +268,21 @@ def _open_compressed(output: Path) -> zarr.Group:
     return root
 
 
-def verify(bin_path: Path, output: Path, *, show_progress: bool = False) -> VerifyResult:
-    """Decode `output` chunk by chunk and compare it with the original SpikeGLX `.bin`."""
+def _verify_chunks(start_chunk: int, stop_chunk: int, *, bin_path: Path, output: Path, chunk: int) -> _VerifyPartial:
     meta = parse_meta(find_meta(bin_path))
     data = open_bin(bin_path, meta)
     root = _open_compressed(output)
     traces = root["traces_seg0"]
     sync = root["sync_seg0"] if "sync_seg0" in root else None
     n_neural = traces.shape[1]
-    bps = root.attrs["compression"]["bps"]
-
-    n_sync_out = sync.shape[1] if sync is not None else 0
-    if traces.shape[0] != data.shape[0] or n_neural + n_sync_out != data.shape[1]:
-        return VerifyResult(bps, False, False, False, -1, float("nan"))
 
     sync_exact = True
     max_err = 0
     err_sq = 0.0
     sums = np.zeros(n_neural)
     sum_sq = np.zeros(n_neural)
-    for start, stop in _iter_chunks(data.shape[0], traces.chunks[0], desc="verifying", show_progress=show_progress):
+    for index in range(start_chunk, stop_chunk):
+        start, stop = _chunk_bounds(index, chunk, data.shape[0])
         original = np.asarray(data[start:stop])
         neural = original[:, :n_neural].astype(np.float64)
         diff = traces[start:stop].astype(np.float64) - neural
@@ -200,6 +293,49 @@ def verify(bin_path: Path, output: Path, *, show_progress: bool = False) -> Veri
         sum_sq += np.square(neural).sum(axis=0)
         if sync is not None and not np.array_equal(sync[start:stop], original[:, n_neural:]):
             sync_exact = False
+    return _VerifyPartial(max_err, err_sq, sums, sum_sq, sync_exact)
+
+
+def verify(
+        bin_path: Path, output: Path, *, show_progress: bool = False, jobs: int | None = None
+) -> VerifyResult:
+    """Decode `output` chunk by chunk and compare it with the original SpikeGLX `.bin`."""
+    jobs = _resolve_jobs(jobs)
+    meta = parse_meta(find_meta(bin_path))
+    data = open_bin(bin_path, meta)
+    root = _open_compressed(output)
+    traces = root["traces_seg0"]
+    sync = root["sync_seg0"] if "sync_seg0" in root else None
+    n_neural = traces.shape[1]
+    bps = root.attrs["compression"]["bps"]
+    chunk = traces.chunks[0]
+
+    n_sync_out = sync.shape[1] if sync is not None else 0
+    if traces.shape[0] != data.shape[0] or n_neural + n_sync_out != data.shape[1]:
+        return VerifyResult(bps, False, False, False, -1, float("nan"))
+
+    partials = _map_chunk_ranges(
+        _verify_chunks,
+        _n_chunks(data.shape[0], chunk),
+        jobs=jobs,
+        desc="verifying",
+        show_progress=show_progress,
+        bin_path=bin_path,
+        output=output,
+        chunk=chunk,
+    )
+
+    sync_exact = True
+    max_err = 0
+    err_sq = 0.0
+    sums = np.zeros(n_neural)
+    sum_sq = np.zeros(n_neural)
+    for part in partials:
+        max_err = max(max_err, part.max_abs_error)
+        err_sq += part.err_sq
+        sums += part.sums
+        sum_sq += part.sum_sq
+        sync_exact = sync_exact and part.sync_exact
 
     signal_sq = float((sum_sq - np.square(sums) / max(data.shape[0], 1)).sum())
     relative = float(np.sqrt(err_sq / signal_sq)) if signal_sq > 0 else 0.0
@@ -213,10 +349,33 @@ def verify(bin_path: Path, output: Path, *, show_progress: bool = False) -> Veri
     )
 
 
+def _restore_chunks(start_chunk: int, stop_chunk: int, *, output: Path, bin_path: Path) -> None:
+    root = _open_compressed(output)
+    traces = root["traces_seg0"]
+    sync = root["sync_seg0"] if "sync_seg0" in root else None
+    chunk = traces.chunks[0]
+    n_samples = traces.shape[0]
+    row_bytes = (traces.shape[1] + (sync.shape[1] if sync is not None else 0)) * SAMPLE_DTYPE.itemsize
+    with bin_path.open("r+b") as f:
+        for index in range(start_chunk, stop_chunk):
+            start, stop = _chunk_bounds(index, chunk, n_samples)
+            block = traces[start:stop]
+            if sync is not None:
+                block = np.hstack([block, sync[start:stop]])
+            f.seek(start * row_bytes)
+            f.write(np.ascontiguousarray(block, dtype=SAMPLE_DTYPE).tobytes())
+
+
 def run_decompress(
-        output: Path, bin_path: Path, *, overwrite: bool = False, show_progress: bool = False
+        output: Path,
+        bin_path: Path,
+        *,
+        overwrite: bool = False,
+        show_progress: bool = False,
+        jobs: int | None = None,
 ) -> Path:
     """Write the Zarr recording back to an interleaved int16 SpikeGLX `.bin` + `.meta`."""
+    jobs = _resolve_jobs(jobs)
     if bin_path.suffix.lower() != ".bin":
         raise ValueError(f"restored file {bin_path} must have a .bin extension")
     meta_path = bin_path.with_suffix(".meta")
@@ -226,17 +385,26 @@ def run_decompress(
     root = _open_compressed(output)
     traces = root["traces_seg0"]
     sync = root["sync_seg0"] if "sync_seg0" in root else None
+    n_samples = traces.shape[0]
+    row_bytes = (traces.shape[1] + (sync.shape[1] if sync is not None else 0)) * SAMPLE_DTYPE.itemsize
+    meta_text = root.attrs["spikeglx_meta_text"]
 
     bin_path.parent.mkdir(parents=True, exist_ok=True)
     try:
+        # Preallocate the full size so each worker can write its byte range in place.
         with bin_path.open("wb") as f:
-            for start, stop in _iter_chunks(traces.shape[0], traces.chunks[0], desc="restoring", show_progress=show_progress):
-                block = traces[start:stop]
-                if sync is not None:
-                    block = np.hstack([block, sync[start:stop]])
-                f.write(np.ascontiguousarray(block, dtype=SAMPLE_DTYPE).tobytes())
+            f.truncate(n_samples * row_bytes)
+        _map_chunk_ranges(
+            _restore_chunks,
+            _n_chunks(n_samples, traces.chunks[0]),
+            jobs=jobs,
+            desc="restoring",
+            show_progress=show_progress,
+            output=output,
+            bin_path=bin_path,
+        )
         with meta_path.open("w", newline="") as f:
-            f.write(root.attrs["spikeglx_meta_text"])
+            f.write(meta_text)
     except BaseException:
         bin_path.unlink(missing_ok=True)
         meta_path.unlink(missing_ok=True)

@@ -8,16 +8,24 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from data_compress.ephys.encode import DEFAULT_LEVEL, run_compress, run_decompress, verify
+from data_compress.ephys.encode import DEFAULT_LEVEL, default_jobs, run_compress, run_decompress, verify
 from data_compress.ephys.probe import ProbeReport, build_probe_report
+
+console = Console()
 
 app = typer.Typer(
     help="Compress SpikeGLX ephys recordings with WavPack (lossless or lossy).",
     context_settings={"help_option_names": ["-h", "--help"]},
 )
-console = Console()
 
 BinArg = typer.Argument(..., exists=True, file_okay=True, dir_okay=False, help="SpikeGLX .bin file")
+JobsOpt = typer.Option(
+    None,
+    "--jobs",
+    "-j",
+    min=1,
+    help=f"Worker processes (default: CPU count, up to {default_jobs()} on this machine)",
+)
 
 
 def _mb(n_bytes: int) -> str:
@@ -56,16 +64,17 @@ def probe(bin_path: Path = BinArg) -> None:
 
 @app.command()
 def compress(
-    bin_path: Path = BinArg,
-    output: Path = typer.Argument(..., help="Output .zarr directory"),
-    bps: float | None = typer.Option(
-        None,
-        help="Lossy target bits per sample (2.25-16); omit for lossless. "
-        "The paper found no spike-sorting degradation at 3, 2.5 or 2.25.",
-    ),
-    level: int = typer.Option(DEFAULT_LEVEL, help="WavPack effort level 1-4 (higher: smaller, slower)"),
-    overwrite: bool = typer.Option(False, help="Replace an existing output"),
-    no_verify: bool = typer.Option(False, "--no-verify", help="Skip re-reading and checking the output"),
+        bin_path: Path = BinArg,
+        output: Path = typer.Argument(..., help="Output .zarr directory"),
+        bps: float | None = typer.Option(
+            None,
+            help="Lossy target bits per sample (2.25-16); omit for lossless. "
+                 "The paper found no spike-sorting degradation at 3, 2.5 or 2.25.",
+        ),
+        level: int = typer.Option(DEFAULT_LEVEL, help="WavPack effort level 1-4 (higher: smaller, slower)"),
+        overwrite: bool = typer.Option(False, help="Replace an existing output"),
+        no_verify: bool = typer.Option(False, "--no-verify", help="Skip re-reading and checking the output"),
+        jobs: int | None = JobsOpt,
 ) -> None:
     """Compress a SpikeGLX .bin into a WavPack-compressed Zarr directory."""
     try:
@@ -76,7 +85,9 @@ def compress(
                 f"[bold yellow]WARNING[/] lossy compression on a {report.stream!r} stream; "
                 "the paper only validated lossy WavPack on AP / wide-band data"
             )
-        result = run_compress(bin_path, output, bps=bps, level=level, overwrite=overwrite, show_progress=True)
+        result = run_compress(
+            bin_path, output, bps=bps, level=level, overwrite=overwrite, show_progress=True, jobs=jobs
+        )
     except (ValueError, FileNotFoundError, FileExistsError) as exc:
         console.print(f"[bold red]Error:[/] {exc}")
         raise typer.Exit(code=1) from exc
@@ -87,11 +98,11 @@ def compress(
         f"({result.ratio:.2f}x)"
     )
     if not no_verify:
-        _verify_and_report(bin_path, output)
+        _verify_and_report(bin_path, output, jobs)
 
 
-def _verify_and_report(bin_path: Path, output: Path) -> None:
-    check = verify(bin_path, output, show_progress=True)
+def _verify_and_report(bin_path: Path, output: Path, jobs: int | None) -> None:
+    check = verify(bin_path, output, show_progress=True, jobs=jobs)
 
     table = Table(title=f"verify: {output.name} vs {bin_path.name}")
     table.add_column("check")
@@ -115,12 +126,13 @@ def _verify_and_report(bin_path: Path, output: Path) -> None:
 
 @app.command(name="verify")
 def verify_command(
-    bin_path: Path = BinArg,
-    zarr_path: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, help="Compressed .zarr"),
+        bin_path: Path = BinArg,
+        zarr_path: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, help="Compressed .zarr"),
+        jobs: int | None = JobsOpt,
 ) -> None:
     """Re-check a compressed .zarr against its original .bin (e.g. after copying it)."""
     try:
-        _verify_and_report(bin_path, zarr_path)
+        _verify_and_report(bin_path, zarr_path, jobs)
     except (ValueError, FileNotFoundError) as exc:
         console.print(f"[bold red]Error:[/] {exc}")
         raise typer.Exit(code=1) from exc
@@ -128,13 +140,14 @@ def verify_command(
 
 @app.command()
 def decompress(
-    zarr_path: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, help="Compressed .zarr"),
-    output: Path = typer.Argument(..., help="Restored .bin path (.meta is written next to it)"),
-    overwrite: bool = typer.Option(False, help="Replace existing .bin/.meta"),
+        zarr_path: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, help="Compressed .zarr"),
+        output: Path = typer.Argument(..., help="Restored .bin path (.meta is written next to it)"),
+        overwrite: bool = typer.Option(False, help="Replace existing .bin/.meta"),
+        jobs: int | None = JobsOpt,
 ) -> None:
     """Restore a compressed recording to a SpikeGLX .bin + .meta (e.g. for Kilosort)."""
     try:
-        run_decompress(zarr_path, output, overwrite=overwrite, show_progress=True)
+        run_decompress(zarr_path, output, overwrite=overwrite, show_progress=True, jobs=jobs)
     except (ValueError, FileNotFoundError, FileExistsError, KeyError) as exc:
         console.print(f"[bold red]Error:[/] {exc}")
         raise typer.Exit(code=1) from exc
