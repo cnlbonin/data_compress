@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import tifffile
 
-from data_compress.video.probe import build_probe_report
+from data_compress.behav.probe import build_probe_report
 
 
 def _write_stack(path: Path, n_pages: int, *, shape=(4, 5), dtype=np.uint8) -> None:

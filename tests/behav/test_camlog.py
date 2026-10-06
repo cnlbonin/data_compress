@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from data_compress.video.camlog import find_camlog, parse_camlog
+from data_compress.behav.camlog import find_camlog, parse_camlog
 
 
 def _write_camlog(path: Path, rows: list[tuple[int, float]]) -> None:

@@ -5,7 +5,7 @@ compromising later analysis.
 
 ## Install
 
-Needs Python ≥ 3.11 and `ffmpeg` (video); the ephys module builds a
+Needs Python ≥ 3.11 and `ffmpeg` (behav); the ephys module builds a
 WavPack extension at install time (on macOS run `brew install wavpack` first; see the
 [ephys README](src/data_compress/ephys/README.md#install)). Commands are bash; on Windows use Git Bash.
 
@@ -38,13 +38,14 @@ dc -h
 
 Update with `pip install --upgrade --force-reinstall --no-deps git+https://github.com/cnlbonin/data_compress`.
 
-See the [video README](src/data_compress/video/README.md#install) for details.
+See the [behav README](src/data_compress/behav/README.md#install) for details.
 
 ## Modules
 
 | Command | Data | Docs |
 |---|---|---|
-| `dc video` | Behavioral camera TIFF sequences (eye/face cams) → mp4/mkv | [video README](src/data_compress/video/README.md) |
+| `dc behav` | Behavioral camera TIFF sequences (eye/face cams) → mp4/mkv | [behav README](src/data_compress/behav/README.md) |
+| `dc neuimg` | Widefield / cellular imaging TIFF stacks → lossless Zarr (OME-NGFF) | [neuimg README](src/data_compress/neuimg/README.md) |
 | `dc ephys` | SpikeGLX `.bin` recordings (Neuropixels) → WavPack-compressed Zarr | [ephys README](src/data_compress/ephys/README.md) |
 
 ## Development

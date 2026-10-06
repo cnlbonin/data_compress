@@ -1,4 +1,4 @@
-"""`dc video ...` commands: probe and compress TIFF sequences."""
+"""`dc behav ...` commands: probe and compress TIFF sequences."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from data_compress.video.encode import run_encode, verify_frame_count
-from data_compress.video.probe import ProbeReport, build_probe_report
+from data_compress.behav.encode import run_encode, verify_frame_count
+from data_compress.behav.probe import ProbeReport, build_probe_report
 
 app = typer.Typer(
     help="Inspect and compress behavioral-camera TIFF sequences.",

@@ -8,7 +8,8 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from data_compress.ephys.encode import DEFAULT_LEVEL, default_jobs, run_compress, run_decompress, verify
+from data_compress.ephys.encode import DEFAULT_LEVEL, run_compress, run_decompress, verify
+from data_compress.parallel import default_jobs
 from data_compress.ephys.probe import ProbeReport, build_probe_report
 
 console = Console()

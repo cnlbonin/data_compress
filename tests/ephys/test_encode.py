@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 import zarr
 
+from data_compress.parallel import chunk_ranges
 from data_compress.ephys.encode import (
-    _chunk_ranges,
     run_compress,
     run_decompress,
     validate_bps,
@@ -195,7 +195,7 @@ def test_decompress_preserves_crlf_meta_byte_for_byte(tmp_path: Path) -> None:
     ("n_chunks", "jobs"), [(0, 4), (1, 4), (3, 8), (4, 1), (100, 3), (1000, 8)]
 )
 def test_chunk_ranges_cover_every_chunk_once_in_order(n_chunks: int, jobs: int) -> None:
-    ranges = _chunk_ranges(n_chunks, jobs)
+    ranges = chunk_ranges(n_chunks, jobs)
 
     covered = [i for start, stop in ranges for i in range(start, stop)]
     assert covered == list(range(n_chunks))

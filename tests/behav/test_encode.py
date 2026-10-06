@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import tifffile
 
-from data_compress.video.encode import (
+from data_compress.behav.encode import (
     check_binaries_available,
     resolve_fps,
     run_encode,

@@ -4,7 +4,7 @@ import numpy as np
 import tifffile
 from typer.testing import CliRunner
 
-from data_compress.video.cli import app
+from data_compress.behav.cli import app
 
 runner = CliRunner()
 
@@ -24,7 +24,7 @@ def test_probe_command_reports_frame_count_and_resolution(tmp_path: Path) -> Non
     assert "64x64" in result.stdout
 
 
-def test_video_app_supports_h_shorthand_for_help() -> None:
+def test_behav_app_supports_h_shorthand_for_help() -> None:
     result = runner.invoke(app, ["-h"])
 
     assert result.exit_code == 0

@@ -1,4 +1,4 @@
-# `dc video`
+# `dc behav`
 
 Compress behavioral-camera recordings (eye/face cams) stored as TIFF frame
 sequences into a single video file, with checks that the compression doesn't
@@ -69,7 +69,7 @@ E:/data/facecam/250913_YW071__2P_YW/run00_152642_linear_combine/
 ### `probe` — inspect without encoding
 
 ```bash
-dc video probe E:/data/facecam/250913_YW071__2P_YW/run00_152642_linear_combine
+dc behav probe E:/data/facecam/250913_YW071__2P_YW/run00_152642_linear_combine
 ```
 
 In Git Bash, write Windows paths with forward slashes (`E:/data/...` or
@@ -83,13 +83,13 @@ its frame count and fps. Shows a WARNING if the TIFF and camlog frame counts dif
 
 ```bash
 # default: lossy H.265 -> .mp4
-dc video compress E:/data/facecam/run00 E:/data/facecam/run00.mp4
+dc behav compress E:/data/facecam/run00 E:/data/facecam/run00.mp4
 
 # exact pixels: lossless FFV1 -> .mkv
-dc video compress E:/data/facecam/run00 E:/data/facecam/run00.mkv --codec lossless
+dc behav compress E:/data/facecam/run00 E:/data/facecam/run00.mkv --codec lossless
 
 # no .camlog? give the frame rate explicitly
-dc video compress E:/data/facecam/run00 E:/data/facecam/run00.mp4 --fps 30
+dc behav compress E:/data/facecam/run00 E:/data/facecam/run00.mp4 --fps 30
 ```
 
 | Option | Default | Meaning |
@@ -129,7 +129,7 @@ There is no built-in batch mode; loop over recordings in the shell. Each
 
 ```bash
 for d in E:/data/facecam/250913_YW071__2P_YW/run*/; do
-  dc video compress "$d" "${d%/}.mp4"
+  dc behav compress "$d" "${d%/}.mp4"
 done
 ```
 

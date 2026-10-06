@@ -11,8 +11,8 @@ from pathlib import Path
 import numpy as np
 from tqdm import tqdm
 
-from data_compress.video.camlog import find_camlog, parse_camlog
-from data_compress.video.tiff_source import iter_frames, scan_tiff_dir
+from data_compress.behav.camlog import find_camlog, parse_camlog
+from data_compress.tiff_source import iter_frames, scan_tiff_dir
 
 DEFAULT_LOSSY_CRF = 18
 REQUIRED_BINARIES = ("ffmpeg", "ffprobe")

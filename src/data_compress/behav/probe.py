@@ -7,8 +7,8 @@ from pathlib import Path
 
 import numpy as np
 
-from data_compress.video.camlog import find_camlog, parse_camlog
-from data_compress.video.tiff_source import scan_tiff_dir
+from data_compress.behav.camlog import find_camlog, parse_camlog
+from data_compress.tiff_source import scan_tiff_dir
 
 
 @dataclass(frozen=True)

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import tifffile
 
-from data_compress.video.tiff_source import iter_frames, scan_tiff_dir
+from data_compress.tiff_source import iter_frame_range, iter_frames, scan_tiff_dir
 
 
 def _write_stack(path: Path, n_pages: int, value_start: int, *, shape=(4, 5), dtype=np.uint8) -> None:
@@ -68,3 +68,14 @@ def test_iter_frames_yields_frames_in_order_across_files(tmp_path: Path) -> None
     frames = list(iter_frames(tmp_path))
 
     assert [int(frame[0, 0]) for frame in frames] == [0, 1, 10, 11]
+
+
+def test_iter_frame_range_spans_file_boundaries(tmp_path: Path) -> None:
+    _write_stack(tmp_path / "run_0000.tif", n_pages=3, value_start=0)
+    _write_stack(tmp_path / "run_0001.tif", n_pages=4, value_start=100)
+    info = scan_tiff_dir(tmp_path)
+
+    values = [int(frame[0, 0]) for frame in iter_frame_range(info.files, info.frames_per_file, 2, 6)]
+
+    assert values == [2, 100, 101, 102]
+    assert info.frames_per_file == [3, 4]
