@@ -16,12 +16,13 @@ import functools
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
 import tifffile
 import zarr
-from zarr.codecs import BloscCodec, BloscShuffle
+from zarr.codecs import BloscCodec
 
 from data_compress.parallel import dir_size, map_chunk_ranges, map_items, prepare_output, resolve_jobs
 from data_compress.tiff_source import TiffStackInfo, iter_frame_range, scan_tiff_dir
@@ -38,7 +39,7 @@ def _check_dtype(dtype: np.dtype) -> None:
 
 
 def _codec(clevel: int) -> BloscCodec:
-    return BloscCodec(cname="zstd", clevel=clevel, shuffle=BloscShuffle.bitshuffle)
+    return BloscCodec(cname="zstd", clevel=clevel, shuffle="bitshuffle")
 
 
 def _ome_attributes(source_name: str, info: TiffStackInfo, fps: float | None) -> dict[str, Any]:
@@ -100,6 +101,7 @@ def run_compress(
         clevel: int = DEFAULT_CLEVEL,
         overwrite: bool = False,
         show_progress: bool = False,
+        on_progress: Callable[[int, int], None] | None = None,
         jobs: int | None = None,
 ) -> CompressResult:
     jobs = resolve_jobs(jobs)
@@ -140,6 +142,7 @@ def run_compress(
             jobs=jobs,
             desc="compressing",
             show_progress=show_progress,
+            on_progress=on_progress,
             files=info.files,
             frames_per_file=info.frames_per_file,
             output=output,
@@ -187,7 +190,8 @@ def _verify_frames(start: int, stop: int, *, files: list[Path], frames_per_file:
 
 
 def verify(
-        tif_dir: Path, output: Path, *, show_progress: bool = False, jobs: int | None = None
+        tif_dir: Path, output: Path, *, show_progress: bool = False, jobs: int | None = None,
+        on_progress: Callable[[int, int], None] | None = None
 ) -> VerifyResult:
     """Decode `output` frame by frame and compare each frame with the source TIFF stack."""
     jobs = resolve_jobs(jobs)
@@ -209,6 +213,7 @@ def verify(
         jobs=jobs,
         desc="verifying",
         show_progress=show_progress,
+            on_progress=on_progress,
         files=info.files,
         frames_per_file=info.frames_per_file,
         output=output,

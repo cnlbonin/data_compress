@@ -11,13 +11,16 @@ import numpy as np
 import tifffile
 
 
+TIFF_SUFFIXES = (".tif", ".tiff")
+
+
 def _natural_sort_key(path: Path) -> list[object]:
     parts = re.split(r"(\d+)", path.name)
     return [int(part) if part.isdigit() else part for part in parts]
 
 
 def _find_tiff_files(tif_dir: Path) -> list[Path]:
-    files = [p for p in tif_dir.iterdir() if p.suffix.lower() in (".tif", ".tiff")]
+    files = [p for p in tif_dir.iterdir() if p.suffix.lower() in TIFF_SUFFIXES]
     if not files:
         raise ValueError(f"no .tif/.tiff files found in {tif_dir}")
     return sorted(files, key=_natural_sort_key)

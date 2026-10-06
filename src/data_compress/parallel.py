@@ -6,6 +6,7 @@ the same byte range of an output file. Results do not depend on the number of jo
 
 from __future__ import annotations
 
+import multiprocessing
 import os
 import shutil
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -16,6 +17,9 @@ import numpy as np
 from tqdm import tqdm
 
 MAX_DEFAULT_JOBS = 8
+# 'spawn' everywhere: the GUI runs batches from a thread, and forking a multi-threaded
+# process can deadlock the child. Windows and macOS already spawn by default.
+MP_CONTEXT = multiprocessing.get_context("spawn")
 TASKS_PER_JOB = 4  # several smaller tasks per worker keep all workers busy to the end
 
 
@@ -58,25 +62,34 @@ def map_chunk_ranges(
         jobs: int,
         desc: str,
         show_progress: bool,
+        on_progress: Callable[[int, int], None] | None = None,
         **kwargs: Any,
 ) -> list[Any]:
-    """Call `worker(start_chunk, stop_chunk, **kwargs)` on each range; results follow range order."""
+    """Call `worker(start_chunk, stop_chunk, **kwargs)` on each range; results follow range order.
+
+    `on_progress(done, total)` is called after each range finishes, with chunk counts.
+    """
     ranges = chunk_ranges(n_chunks, jobs)
     bar = tqdm(total=n_chunks, unit="chunk", desc=desc, disable=not show_progress)
+    done = 0
     try:
         if jobs == 1:
             results = []
             for start, stop in ranges:
                 results.append(worker(start, stop, **kwargs))
+                done += stop - start
                 bar.update(stop - start)
+                _report(on_progress, done, n_chunks)
             return results
-        with ProcessPoolExecutor(max_workers=jobs) as pool:
+        with ProcessPoolExecutor(max_workers=jobs, mp_context=MP_CONTEXT) as pool:
             futures = {pool.submit(worker, start, stop, **kwargs): (start, stop) for start, stop in ranges}
             try:
                 for future in as_completed(futures):
                     future.result()  # re-raises the worker's error
                     start, stop = futures[future]
+                    done += stop - start
                     bar.update(stop - start)
+                    _report(on_progress, done, n_chunks)
             except BaseException:
                 for future in futures:
                     future.cancel()
@@ -93,22 +106,25 @@ def map_items(
         jobs: int,
         desc: str,
         show_progress: bool,
+        on_progress: Callable[[int, int], None] | None = None,
 ) -> list[Any]:
     """Call `worker(item)` for each item in a process pool; results follow item order."""
     bar = tqdm(total=len(items), unit="file", desc=desc, disable=not show_progress)
     try:
         if jobs == 1 or len(items) <= 1:
             results = []
-            for item in items:
+            for index, item in enumerate(items, 1):
                 results.append(worker(item))
                 bar.update(1)
+                _report(on_progress, index, len(items))
             return results
-        with ProcessPoolExecutor(max_workers=min(jobs, len(items))) as pool:
+        with ProcessPoolExecutor(max_workers=min(jobs, len(items)), mp_context=MP_CONTEXT) as pool:
             futures = [pool.submit(worker, item) for item in items]
             try:
-                for future in as_completed(futures):
+                for done, future in enumerate(as_completed(futures), 1):
                     future.result()  # re-raises the worker's error
                     bar.update(1)
+                    _report(on_progress, done, len(items))
             except BaseException:
                 for future in futures:
                     future.cancel()
@@ -116,6 +132,11 @@ def map_items(
             return [future.result() for future in futures]
     finally:
         bar.close()
+
+
+def _report(on_progress: Callable[[int, int], None] | None, done: int, total: int) -> None:
+    if on_progress is not None:
+        on_progress(done, total)
 
 
 def prepare_output(path: Path, overwrite: bool) -> None:

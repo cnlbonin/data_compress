@@ -15,3 +15,11 @@ app = typer.Typer(
 app.add_typer(behav_app, name="behav")
 app.add_typer(ephys_app, name="ephys")
 app.add_typer(neuimg_app, name="neuimg")
+
+
+@app.command()
+def gui() -> None:
+    """Open a simple window for batch compression (data type, sessions, progress)."""
+    from data_compress.gui.app import run  # imported here so the CLI works without tkinter
+
+    run()

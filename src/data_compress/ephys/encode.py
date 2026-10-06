@@ -15,6 +15,7 @@ chunk or the same byte range of the restored `.bin`.
 from __future__ import annotations
 
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
@@ -79,6 +80,7 @@ def run_compress(
         level: int = DEFAULT_LEVEL,
         overwrite: bool = False,
         show_progress: bool = False,
+        on_progress: Callable[[int, int], None] | None = None,
         jobs: int | None = None,
 ) -> CompressResult:
     validate_bps(bps)
@@ -137,6 +139,7 @@ def run_compress(
             jobs=jobs,
             desc="compressing",
             show_progress=show_progress,
+            on_progress=on_progress,
             bin_path=bin_path,
             output=output,
             chunk=chunk,
@@ -222,7 +225,8 @@ def _verify_chunks(start_chunk: int, stop_chunk: int, *, bin_path: Path, output:
 
 
 def verify(
-        bin_path: Path, output: Path, *, show_progress: bool = False, jobs: int | None = None
+        bin_path: Path, output: Path, *, show_progress: bool = False, jobs: int | None = None,
+        on_progress: Callable[[int, int], None] | None = None
 ) -> VerifyResult:
     """Decode `output` chunk by chunk and compare it with the original SpikeGLX `.bin`."""
     jobs = resolve_jobs(jobs)
@@ -245,6 +249,7 @@ def verify(
         jobs=jobs,
         desc="verifying",
         show_progress=show_progress,
+            on_progress=on_progress,
         bin_path=bin_path,
         output=output,
         chunk=chunk,

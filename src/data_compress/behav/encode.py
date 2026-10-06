@@ -5,6 +5,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -144,6 +145,7 @@ def run_encode(
         crf: int | None = None,
         force: bool = False,
         show_progress: bool = False,
+        on_progress: Callable[[int, int], None] | None = None,
 ) -> EncodeResult:
     check_binaries_available()
 
@@ -178,6 +180,8 @@ def run_encode(
                     frame = (frame >> 8).astype(np.uint8)
                 proc.stdin.write(frame.tobytes())
                 frame_count_written += 1
+                if on_progress is not None:
+                    on_progress(frame_count_written, info.frame_count)
             frames.close()
             proc.stdin.close()
         except Exception as exc:
