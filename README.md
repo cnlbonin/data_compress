@@ -49,6 +49,20 @@ See the [behav README](src/data_compress/behav/README.md#install) for details.
 | `dc ephys` | SpikeGLX `.bin` recordings (Neuropixels) → WavPack-compressed Zarr | [ephys README](src/data_compress/ephys/README.md) |
 | `dc gui` | Window for batch compression of all three data types (see [GUI](#gui)) | this README |
 
+## Terminal demo
+
+Inspect a behavioral-camera TIFF directory, then compress it to mp4:
+
+```bash
+dc behav probe ~/data/test/facemap/raw
+dc behav compress ~/data/test/facemap/raw run000.mp4
+```
+
+![dc behav in the terminal](docs/behav.gif)
+
+The recording is made with [VHS](https://github.com/charmbracelet/vhs); rerun it from the
+repo root with `vhs docs/behav.tape`.
+
 ## GUI
 
 `dc gui` opens a window for batch compression, as an alternative to the CLI:
@@ -57,6 +71,10 @@ See the [behav README](src/data_compress/behav/README.md#install) for details.
 2. add sessions with **Add…**, or find all sessions under a folder with **Scan folder…**;
 3. set the options: codec (behav), bits per sample (ephys), fps (behav, optional), and whether to verify;
 4. press **Start batch**. The bars show overall progress and the current session.
+
+![dc gui while a behav session is compressing](docs/gui_running.png)
+
+![dc gui after the batch has finished](docs/gui_done.png)
 
 Session paths are shown in full in the table, and the table scrolls horizontally for long paths.
 
