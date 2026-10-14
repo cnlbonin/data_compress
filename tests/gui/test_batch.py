@@ -16,6 +16,7 @@ from data_compress.gui.batch import (
     run_session,
 )
 from tests.ephys.spikeglx_fixtures import make_traces, write_spikeglx
+from tests.sbx_fixtures import make_frames, write_sbx
 
 
 def _tiff_run(directory: Path, n_pages: int = 3, *, seed: int = 0, dtype=np.uint16) -> None:
@@ -34,6 +35,7 @@ def test_output_names_follow_cli_batch_convention() -> None:
     assert output_for("behav", run, Options()) == Path("/data/sess/run00.mp4")
     assert output_for("behav", run, Options(behav_codec="lossless")) == Path("/data/sess/run00.mkv")
     assert output_for("neuimg", run, Options()) == Path("/data/sess/run00.zarr")
+    assert output_for("neuimg", Path("/data/sess/run00.sbx"), Options()) == Path("/data/sess/run00.zarr")
     assert output_for("ephys", Path("/data/g0.imec0.ap.bin"), Options()) == Path("/data/g0.imec0.ap.zarr")
 
 
@@ -45,6 +47,22 @@ def test_find_sessions_finds_tiff_dirs_at_any_depth(tmp_path: Path) -> None:
     found = find_sessions("behav", tmp_path)
 
     assert found == [tmp_path / "day1" / "run00", tmp_path / "day2" / "run01"]
+
+
+def test_find_sessions_for_neuimg_finds_tiff_dirs_and_sbx_files(tmp_path: Path) -> None:
+    _tiff_run(tmp_path / "day1" / "run00")
+    write_sbx(tmp_path / "day2", make_frames(4), name="run01")
+
+    found = find_sessions("neuimg", tmp_path)
+
+    assert found == [tmp_path / "day1" / "run00", tmp_path / "day2" / "run01.sbx"]
+
+
+def test_find_sessions_for_neuimg_skips_sbx_without_mat_sidecar(tmp_path: Path) -> None:
+    sbx = write_sbx(tmp_path, make_frames(4), name="run00")
+    sbx.with_suffix(".mat").unlink()
+
+    assert find_sessions("neuimg", tmp_path) == []
 
 
 def test_find_sessions_for_ephys_needs_meta_sibling(tmp_path: Path) -> None:
@@ -82,6 +100,18 @@ def test_run_batch_compresses_and_verifies_each_session_with_progress(tmp_path: 
     assert (0, "compressing", 3, 3) in progress
     assert (1, "verifying", 3, 3) in progress
     assert (tmp_path / "s1.zarr").exists() and (tmp_path / "s2.zarr").exists()
+
+
+def test_run_batch_compresses_and_verifies_sbx_session(tmp_path: Path) -> None:
+    sbx = write_sbx(tmp_path, make_frames(5), name="run00")
+    options = Options(verify=True)
+    session = make_session("neuimg", sbx, options)
+
+    result = run_session(session, options, _noop_progress)
+
+    assert result.status == "ok", result.message
+    assert session.output == tmp_path / "run00.zarr"
+    assert session.output.exists()
 
 
 def test_run_batch_runs_behav_session_into_mp4(tmp_path: Path) -> None:

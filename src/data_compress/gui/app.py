@@ -28,6 +28,7 @@ from data_compress.gui.batch import (
     output_for,
     run_batch,
 )
+from data_compress.sbx_source import SBX_SUFFIX
 from data_compress.tiff_source import TIFF_SUFFIXES
 
 POLL_MS = 100
@@ -41,6 +42,8 @@ def _is_valid_source(data_type: DataType, path: Path) -> bool:
     try:
         if data_type == "ephys":
             return path.is_file() and path.suffix.lower() == ".bin" and path.with_suffix(".meta").is_file()
+        if data_type == "neuimg" and path.suffix.lower() == SBX_SUFFIX:
+            return path.is_file() and path.with_suffix(".mat").is_file()
         return path.is_dir() and any(p.suffix.lower() in TIFF_SUFFIXES for p in path.iterdir())
     except OSError:
         return False
@@ -129,6 +132,8 @@ class BatchApp(tk.Tk):
             button = ttk.Button(buttons, text=text, command=command)
             button.pack(side="left", padx=4)
             self.controls.append(button)
+        self.add_sbx_button = ttk.Button(buttons, text="Add .sbx…", command=self._add_sbx)
+        self.controls.append(self.add_sbx_button)
 
         tree_frame = ttk.Frame(sessions_box)
         tree_frame.pack(fill="both", expand=True, padx=4, pady=(0, 4))
@@ -181,6 +186,9 @@ class BatchApp(tk.Tk):
         {"behav": self.behav_options, "ephys": self.ephys_options, "neuimg": self.neuimg_options}[
             self.data_type.get()
         ].pack(fill="x", pady=2)
+        self.add_sbx_button.pack_forget()
+        if self.data_type.get() == "neuimg":
+            self.add_sbx_button.pack(side="left", padx=4)
 
     # options and session list
 
@@ -230,6 +238,10 @@ class BatchApp(tk.Tk):
         else:
             chosen = filedialog.askdirectory(mustexist=True)
             paths = [Path(chosen)] if chosen else []
+        self._add_paths(paths)
+
+    def _add_sbx(self) -> None:
+        paths = [Path(p) for p in filedialog.askopenfilenames(filetypes=[("Scanbox recording", "*.sbx"), ("All files", "*.*")])]
         self._add_paths(paths)
 
     def _scan(self) -> None:

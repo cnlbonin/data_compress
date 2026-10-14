@@ -9,6 +9,7 @@ import tifffile
 import data_compress.gui.app as app_module
 from data_compress.gui.app import BatchApp
 from tests.ephys.spikeglx_fixtures import make_traces, write_spikeglx
+from tests.sbx_fixtures import make_frames, write_sbx
 
 
 class _StubEntry:
@@ -72,6 +73,37 @@ def test_add_and_run_neuimg_batch_through_window(app: BatchApp, tmp_path: Path) 
     assert all(status.startswith("done") for status in app.session_status), app.session_status
     assert (tmp_path / "run00.zarr").exists() and (tmp_path / "run01.zarr").exists()
     assert app.overall_label.cget("text").startswith("Finished: 2 done")
+
+
+def test_add_and_run_sbx_session_through_window(app: BatchApp, tmp_path: Path) -> None:
+    sbx = write_sbx(tmp_path, make_frames(5), name="run00")
+    app.data_type.set("neuimg")
+    app._on_type_change()
+
+    app._add_paths([sbx])
+    assert len(app.sessions) == 1
+    assert app.sessions[0].output == tmp_path / "run00.zarr"
+
+    app._start()
+    _pump_until_idle(app)
+
+    assert all(status.startswith("done") for status in app.session_status), app.session_status
+    assert (tmp_path / "run00.zarr").exists()
+
+
+def test_rejects_sbx_file_missing_mat_sidecar(app: BatchApp, tmp_path: Path, monkeypatch) -> None:
+    errors: list[str] = []
+    warnings: list[str] = []
+    _silence_dialogs(monkeypatch, errors, warnings)
+    sbx = write_sbx(tmp_path, make_frames(5), name="run00")
+    sbx.with_suffix(".mat").unlink()
+    app.data_type.set("neuimg")
+    app._on_type_change()
+
+    app._add_paths([sbx])
+
+    assert app.sessions == []
+    assert warnings and str(sbx) in warnings[0]
 
 
 def test_rejects_paths_that_are_not_sessions(app: BatchApp, tmp_path: Path, monkeypatch) -> None:

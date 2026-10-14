@@ -18,13 +18,14 @@ from data_compress.ephys.encode import run_compress as run_ephys_compress
 from data_compress.ephys.encode import verify as verify_ephys
 from data_compress.neuimg.encode import run_compress as run_neuimg_compress
 from data_compress.neuimg.encode import verify as verify_neuimg
+from data_compress.sbx_source import SBX_SUFFIX
 from data_compress.tiff_source import TIFF_SUFFIXES
 
 DataType = Literal["behav", "ephys", "neuimg"]
 DATA_TYPE_LABELS: dict[str, str] = {
     "behav": "Behavioral video (TIFF → mp4 / mkv)",
     "ephys": "Ephys (SpikeGLX .bin → Zarr)",
-    "neuimg": "Imaging (TIFF → lossless Zarr)",
+    "neuimg": "Imaging (TIFF or Scanbox .sbx → lossless Zarr)",
 }
 DATA_TYPES: tuple[DataType, ...] = ("behav", "ephys", "neuimg")
 
@@ -59,17 +60,22 @@ def output_for(data_type: DataType, source: Path, options: Options) -> Path:
         ext = ".mp4" if options.behav_codec == "lossy" else ".mkv"
         return source.with_name(source.name + ext)  # sibling of the run folder, as in the CLI batch loop
     if data_type == "neuimg":
+        if source.suffix.lower() == SBX_SUFFIX:
+            return source.with_suffix(".zarr")  # run00.sbx -> run00.zarr
         return source.with_name(source.name + ".zarr")
     return source.with_suffix(".zarr")  # ephys: run_g0.imec0.ap.bin -> run_g0.imec0.ap.zarr
 
 
 def find_sessions(data_type: DataType, root: Path) -> list[Path]:
-    """Find sessions under `root`: TIFF directories (any depth) or `.bin` files with a `.meta` sibling."""
+    """Find sessions under `root`: TIFF directories (any depth), `.sbx` files (neuimg), or `.bin` files with a
+    `.meta` sibling (ephys)."""
     if data_type == "ephys":
         bins = sorted(p for p in root.rglob("*.bin") if p.is_file())
         return [p for p in bins if p.with_suffix(".meta").is_file()]
-    dirs = {p.parent for p in root.rglob("*") if p.is_file() and p.suffix.lower() in TIFF_SUFFIXES}
-    return sorted(dirs)
+    sessions = {p.parent for p in root.rglob("*") if p.is_file() and p.suffix.lower() in TIFF_SUFFIXES}
+    if data_type == "neuimg":
+        sessions |= {p for p in root.rglob(f"*{SBX_SUFFIX}") if p.with_suffix(".mat").is_file()}
+    return sorted(sessions)
 
 
 def make_session(data_type: DataType, source: Path, options: Options) -> Session:

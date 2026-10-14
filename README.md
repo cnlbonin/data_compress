@@ -68,7 +68,8 @@ repo root with `vhs docs/behav.tape`.
 `dc gui` opens a window for batch compression, as an alternative to the CLI:
 
 1. choose the data type: behavioral video, ephys, or imaging;
-2. add sessions with **Add…**, or find all sessions under a folder with **Scan folder…**;
+2. add sessions with **Add…** (TIFF directories; imaging also has **Add .sbx…** for Scanbox files),
+   or find all sessions under a folder with **Scan folder…**;
 3. set the options: codec (behav), bits per sample (ephys), fps (behav, optional), and whether to verify;
 4. press **Start batch**. The bars show overall progress and the current session.
 
