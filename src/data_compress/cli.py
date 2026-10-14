@@ -1,4 +1,4 @@
-"""Root CLI: `dc <data-type> <command>`."""
+"""Root CLI: `dcp <data-type> <command>`."""
 
 from __future__ import annotations
 

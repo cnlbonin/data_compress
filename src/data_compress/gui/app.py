@@ -424,7 +424,7 @@ def run() -> None:
         return
     if "display" in problem:
         hint = (
-            "This shell has no graphical display. Run `dc gui` from a desktop terminal, "
+            "This shell has no graphical display. Run `dcp gui` from a desktop terminal, "
             "or over SSH with X forwarding (`ssh -X` or `ssh -Y`), or set DISPLAY."
         )
     else:
@@ -432,5 +432,5 @@ def run() -> None:
             "Try a Python whose Tk matches your system, e.g. the distro python3 with tkinter, "
             "or `conda install -c conda-forge tk` in the environment."
         )
-    print(f"dc gui cannot open a window with this Python ({sys.executable}): {problem}.\n{hint}", file=sys.stderr)
+    print(f"dcp gui cannot open a window with this Python ({sys.executable}): {problem}.\n{hint}", file=sys.stderr)
     raise SystemExit(1)

@@ -1,4 +1,4 @@
-# `dc ephys`
+# `dcp ephys`
 
 Compress SpikeGLX recordings (Neuropixels `.ap.bin` / `.lf.bin`, `.nidq.bin`)
 with **WavPack**, the codec that Buccino et al. found best for extracellular
@@ -33,16 +33,16 @@ platform step first:
   ("Desktop development with C++") and rerun the install.
 - **Linux**: uses the system `wavpack` if present, else bundled builds (glibc 2.35 / 2.39).
 
-Then install the `dc` command with [uv](https://docs.astral.sh/uv/) (recommended):
+Then install the `dcp` command with [uv](https://docs.astral.sh/uv/) (recommended):
 
 ```bash
 uv tool install git+https://github.com/cnlbonin/data_compress
-dc ephys -h
+dcp ephys -h
 ```
 
 uv installs straight from GitHub (no clone needed), keeps the tool in its own
-isolated environment and puts `dc` on your PATH.
-If `dc` is then "command not found", run `uv tool update-shell` and reopen the
+isolated environment and puts `dcp` on your PATH.
+If `dcp` is then "command not found", run `uv tool update-shell` and reopen the
 terminal.
 
 | Task | Command |
@@ -51,8 +51,8 @@ terminal.
 | check what is installed | `uv tool list` |
 | remove | `uv tool uninstall data-compress` |
 
-If you installed before the command was renamed to `dc`, the upgrade above
-replaces the old `data-compress` command with `dc`.
+Upgrading also replaces older command names from before renames: `data-compress`,
+then `dc` (which collided with the Unix `dc` calculator), now `dcp`.
 
 conda users: see the [top-level install](../../../README.md#install) and run
 `brew install wavpack` (macOS) before `pip install git+https://github.com/cnlbonin/data_compress`.
@@ -62,7 +62,7 @@ conda users: see the [top-level install](../../../README.md#install) and run
 ### `probe`: inspect without writing
 
 ```bash
-dc ephys probe .../run_g0_t0.imec0.ap.bin
+dcp ephys probe .../run_g0_t0.imec0.ap.bin
 ```
 
 Shows the stream type, neural and sync channel counts, sample rate, duration and
@@ -73,10 +73,10 @@ which usually means the recording is truncated or still being written.
 
 ```bash
 # lossless (default)
-dc ephys compress run_g0_t0.imec0.ap.bin run_g0_t0.imec0.ap.zarr
+dcp ephys compress run_g0_t0.imec0.ap.bin run_g0_t0.imec0.ap.zarr
 
 # lossy, ~5x
-dc ephys compress run_g0_t0.imec0.ap.bin run_g0_t0.imec0.ap.zarr --bps 3
+dcp ephys compress run_g0_t0.imec0.ap.bin run_g0_t0.imec0.ap.zarr --bps 3
 ```
 
 | Option | Default | Meaning |
@@ -104,7 +104,7 @@ TTL bits are what you align behaviour and imaging to. Lossy coding would corrupt
 ### `verify`: re-check an existing output
 
 ```bash
-dc ephys verify run_g0_t0.imec0.ap.bin run_g0_t0.imec0.ap.zarr
+dcp ephys verify run_g0_t0.imec0.ap.bin run_g0_t0.imec0.ap.zarr
 ```
 
 It accepts `--jobs` too.
@@ -113,12 +113,12 @@ Runs the same read-back check as `compress`, for an output written earlier, e.g.
 after copying it to the server and before deleting the raw `.bin`. It prints the
 mode, whether the data and sync channel(s) are identical, the max absolute error
 and the relative RMS error, then PASS or FAIL. It exits with code 1 on FAIL, so you
-can chain it in scripts: `dc ephys verify a.bin a.zarr && rm a.bin`.
+can chain it in scripts: `dcp ephys verify a.bin a.zarr && rm a.bin`.
 
 ### `decompress`: back to SpikeGLX binary
 
 ```bash
-dc ephys decompress run_g0_t0.imec0.ap.zarr restored/run_g0_t0.imec0.ap.bin
+dcp ephys decompress run_g0_t0.imec0.ap.zarr restored/run_g0_t0.imec0.ap.bin
 ```
 
 Writes the interleaved int16 `.bin` plus the original `.meta`. For lossless

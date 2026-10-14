@@ -1,4 +1,4 @@
-"""`dc ephys ...` commands: probe, compress and restore SpikeGLX recordings."""
+"""`dcp ephys ...` commands: probe, compress and restore SpikeGLX recordings."""
 
 from __future__ import annotations
 

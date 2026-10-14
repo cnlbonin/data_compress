@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
-dc = "data_compress:main"
+dcp = "data_compress:main"
 
 [build-system]
 requires = ["hatchling"]

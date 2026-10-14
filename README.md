@@ -14,7 +14,7 @@ uv installs straight from GitHub, so you don't need to clone the repo:
 
 ```bash
 uv tool install git+https://github.com/cnlbonin/data_compress
-dc -h
+dcp -h
 ```
 
 | Task | Command |
@@ -24,8 +24,8 @@ dc -h
 | use SSH instead of HTTPS | `uv tool install git+ssh://git@github.com/cnlbonin/data_compress.git` |
 | remove | `uv tool uninstall data-compress` |
 
-Upgrading also replaces the old `data-compress` command from installs made
-before the command was renamed to `dc`.
+Upgrading also replaces older command names from before renames: `data-compress`,
+then `dc` (which collided with the Unix `dc` calculator), now `dcp`.
 
 Or with conda (installs ffmpeg too):
 
@@ -33,7 +33,7 @@ Or with conda (installs ffmpeg too):
 conda create -n data-compress -c conda-forge python=3.11 ffmpeg
 conda activate data-compress
 pip install git+https://github.com/cnlbonin/data_compress
-dc -h
+dcp -h
 ```
 
 Update with `pip install --upgrade --force-reinstall --no-deps git+https://github.com/cnlbonin/data_compress`.
@@ -44,28 +44,28 @@ See the [behav README](src/data_compress/behav/README.md#install) for details.
 
 | Command | Data | Docs |
 |---|---|---|
-| `dc behav` | Behavioral camera TIFF sequences (eye/face cams) → mp4/mkv | [behav README](src/data_compress/behav/README.md) |
-| `dc neuimg` | Widefield / cellular imaging TIFF stacks or Scanbox `.sbx` recordings → lossless Zarr (OME-NGFF) | [neuimg README](src/data_compress/neuimg/README.md) |
-| `dc ephys` | SpikeGLX `.bin` recordings (Neuropixels) → WavPack-compressed Zarr | [ephys README](src/data_compress/ephys/README.md) |
-| `dc gui` | Window for batch compression of all three data types (see [GUI](#gui)) | this README |
+| `dcp behav` | Behavioral camera TIFF sequences (eye/face cams) → mp4/mkv | [behav README](src/data_compress/behav/README.md) |
+| `dcp neuimg` | Widefield / cellular imaging TIFF stacks or Scanbox `.sbx` recordings → lossless Zarr (OME-NGFF) | [neuimg README](src/data_compress/neuimg/README.md) |
+| `dcp ephys` | SpikeGLX `.bin` recordings (Neuropixels) → WavPack-compressed Zarr | [ephys README](src/data_compress/ephys/README.md) |
+| `dcp gui` | Window for batch compression of all three data types (see [GUI](#gui)) | this README |
 
 ## Terminal demo
 
 Inspect a behavioral-camera TIFF directory, then compress it to mp4:
 
 ```bash
-dc behav probe ~/data/test/facemap/raw
-dc behav compress ~/data/test/facemap/raw run000.mp4
+dcp behav probe ~/data/test/facemap/raw
+dcp behav compress ~/data/test/facemap/raw run000.mp4
 ```
 
-![dc behav in the terminal](docs/behav.gif)
+![dcp behav in the terminal](docs/behav.gif)
 
 The recording is made with [VHS](https://github.com/charmbracelet/vhs); rerun it from the
 repo root with `vhs docs/behav.tape`.
 
 ## GUI
 
-`dc gui` opens a window for batch compression, as an alternative to the CLI:
+`dcp gui` opens a window for batch compression, as an alternative to the CLI:
 
 1. choose the data type: behavioral video, ephys, or imaging;
 2. add sessions with **Add…** (TIFF directories; imaging also has **Add .sbx…** for Scanbox files),
@@ -73,9 +73,9 @@ repo root with `vhs docs/behav.tape`.
 3. set the options: codec (behav), bits per sample (ephys), fps (behav, optional), and whether to verify;
 4. press **Start batch**. The bars show overall progress and the current session.
 
-![dc gui while a behav session is compressing](docs/gui_running.png)
+![dcp gui while a behav session is compressing](docs/gui_running.png)
 
-![dc gui after the batch has finished](docs/gui_done.png)
+![dcp gui after the batch has finished](docs/gui_done.png)
 
 Session paths are shown in full in the table, and the table scrolls horizontally for long paths.
 
@@ -90,9 +90,9 @@ GUI does not expose `--jobs`.
 
 ### Troubleshooting
 
-`dc gui` checks Tk before opening the window and reports a problem if it can't:
+`dcp gui` checks Tk before opening the window and reports a problem if it can't:
 
-- **"no graphical display"**: the shell has no `DISPLAY` set. Run `dc gui` from a
+- **"no graphical display"**: the shell has no `DISPLAY` set. Run `dcp gui` from a
   desktop terminal, or over SSH with X forwarding (`ssh -X` or `ssh -Y`).
 - **"Tk aborted (signal 6) while creating a text-entry widget"**: the Python in use
   has a Tk build that does not match the system X libraries. Some uv builds (the

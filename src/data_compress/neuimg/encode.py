@@ -224,7 +224,7 @@ def _open_compressed(output: Path) -> zarr.Group:
         raise ValueError(f"{output} is not a Zarr group: {exc}") from exc
     has_marker = "source_kind" in root.attrs or "source_files" in root.attrs
     if ARRAY_NAME not in root or not has_marker:
-        raise ValueError(f"{output} is not a recording written by `dc neuimg compress`")
+        raise ValueError(f"{output} is not a recording written by `dcp neuimg compress`")
     return root
 
 

@@ -1,4 +1,4 @@
-# `dc neuimg`
+# `dcp neuimg`
 
 Losslessly compress widefield and cellular (2P / calcium) imaging recordings
 stored as multi-page **TIFF stacks** or as a **Scanbox `.sbx`** recording
@@ -16,14 +16,14 @@ Compression is always lossless. There is no `--bps` or other lossy option.
 
 Suite2p reads `.sbx` itself (via the `sbxreader` package) or TIFF directly,
 but it does not read Zarr. So if you plan to run suite2p on data you've
-archived here, convert the archived Zarr back to TIFF (`dc neuimg
+archived here, convert the archived Zarr back to TIFF (`dcp neuimg
 decompress`) or to `.sbx` first — archiving to Zarr does not change how you
 run suite2p afterwards.
 
 ## Install
 
 See the [top-level install](../../../README.md#install). You need
-`dc` on your PATH; no extra system packages are required.
+`dcp` on your PATH; no extra system packages are required.
 
 ## Input layout
 
@@ -61,8 +61,8 @@ E:/data/2p/250913_YW071/run00.mat
 ### `probe`: inspect without writing
 
 ```bash
-dc neuimg probe E:/data/widefield/250913_YW071/run00
-dc neuimg probe E:/data/2p/250913_YW071/run00.sbx
+dcp neuimg probe E:/data/widefield/250913_YW071/run00
+dcp neuimg probe E:/data/2p/250913_YW071/run00.sbx
 ```
 
 Prints frame count, resolution, dtype and total size (plus file count for TIFF,
@@ -71,8 +71,8 @@ or channel/plane counts for `.sbx`).
 ### `compress`
 
 ```bash
-dc neuimg compress E:/data/widefield/run00 E:/data/widefield/run00.zarr --fps 30
-dc neuimg compress E:/data/2p/run00.sbx E:/data/2p/run00.zarr --fps 15
+dcp neuimg compress E:/data/widefield/run00 E:/data/widefield/run00.zarr --fps 30
+dcp neuimg compress E:/data/2p/run00.sbx E:/data/2p/run00.zarr --fps 15
 ```
 
 | Option | Default | Meaning |
@@ -89,8 +89,8 @@ After writing, the output is decoded and compared with the source frame by frame
 ### `verify`: re-check an existing output
 
 ```bash
-dc neuimg verify E:/data/widefield/run00 E:/data/widefield/run00.zarr
-dc neuimg verify E:/data/2p/run00.sbx E:/data/2p/run00.zarr
+dcp neuimg verify E:/data/widefield/run00 E:/data/widefield/run00.zarr
+dcp neuimg verify E:/data/2p/run00.sbx E:/data/2p/run00.zarr
 ```
 
 Use it after copying the `.zarr` to the server and before deleting the source.
@@ -99,8 +99,8 @@ Exits with code 1 on FAIL.
 ### `decompress`: back to the original format
 
 ```bash
-dc neuimg decompress E:/data/widefield/run00.zarr restored/run00
-dc neuimg decompress E:/data/2p/run00.zarr restored/run00
+dcp neuimg decompress E:/data/widefield/run00.zarr restored/run00
+dcp neuimg decompress E:/data/2p/run00.zarr restored/run00
 ```
 
 For TIFF input, writes one TIFF per original file, with the original names and
@@ -133,5 +133,5 @@ frames[100:200]        # a range, without decoding the whole recording
 ## Size
 
 The compression ratio depends on the data: sensor noise limits how much a lossless
-codec can save. Run `dc neuimg compress` on a real recording and record the ratio
+codec can save. Run `dcp neuimg compress` on a real recording and record the ratio
 it prints here.

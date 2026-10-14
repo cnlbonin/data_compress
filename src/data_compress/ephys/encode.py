@@ -192,7 +192,7 @@ def _open_compressed(output: Path) -> zarr.Group:
     except Exception as exc:  # zarr raises several unrelated types for "not a group"
         raise ValueError(f"{output} is not a Zarr group: {exc}") from exc
     if "traces_seg0" not in root or "compression" not in root.attrs:
-        raise ValueError(f"{output} is not a recording written by `dc ephys compress`")
+        raise ValueError(f"{output} is not a recording written by `dcp ephys compress`")
     return root
 
 

@@ -1,4 +1,4 @@
-# `dc behav`
+# `dcp behav`
 
 Compress behavioral-camera recordings (eye/face cams) stored as TIFF frame
 sequences into a single video file, with checks that the compression doesn't
@@ -21,14 +21,14 @@ Install [uv](https://docs.astral.sh/uv/) and ffmpeg, then:
 
 ```bash
 uv tool install git+https://github.com/cnlbonin/data_compress
-dc -h
+dcp -h
 ```
 
 uv fetches a suitable Python itself and keeps the tool in its own isolated
 environment, so it can't clash with other Python setups on the acquisition PC.
 It installs straight from GitHub; no clone needed (Git Bash provides `git`).
 
-If `dc` is then "command not found", run `uv tool update-shell` and
+If `dcp` is then "command not found", run `uv tool update-shell` and
 reopen the terminal. To update to the latest `main`, run `uv tool upgrade data-compress`.
 
 ### Option B — conda (installs ffmpeg for you)
@@ -37,7 +37,7 @@ reopen the terminal. To update to the latest `main`, run `uv tool upgrade data-c
 conda create -n data-compress -c conda-forge python=3.11 ffmpeg
 conda activate data-compress
 pip install git+https://github.com/cnlbonin/data_compress
-dc -h
+dcp -h
 ```
 
 If `conda activate` doesn't work in Git Bash, run `conda init bash` once and
@@ -69,7 +69,7 @@ E:/data/facecam/250913_YW071__2P_YW/run00_152642_linear_combine/
 ### `probe` — inspect without encoding
 
 ```bash
-dc behav probe E:/data/facecam/250913_YW071__2P_YW/run00_152642_linear_combine
+dcp behav probe E:/data/facecam/250913_YW071__2P_YW/run00_152642_linear_combine
 ```
 
 In Git Bash, write Windows paths with forward slashes (`E:/data/...` or
@@ -83,13 +83,13 @@ its frame count and fps. Shows a WARNING if the TIFF and camlog frame counts dif
 
 ```bash
 # default: lossy H.265 -> .mp4
-dc behav compress E:/data/facecam/run00 E:/data/facecam/run00.mp4
+dcp behav compress E:/data/facecam/run00 E:/data/facecam/run00.mp4
 
 # exact pixels: lossless FFV1 -> .mkv
-dc behav compress E:/data/facecam/run00 E:/data/facecam/run00.mkv --codec lossless
+dcp behav compress E:/data/facecam/run00 E:/data/facecam/run00.mkv --codec lossless
 
 # no .camlog? give the frame rate explicitly
-dc behav compress E:/data/facecam/run00 E:/data/facecam/run00.mp4 --fps 30
+dcp behav compress E:/data/facecam/run00 E:/data/facecam/run00.mp4 --fps 30
 ```
 
 | Option | Default | Meaning |
@@ -129,7 +129,7 @@ There is no built-in batch mode; loop over recordings in the shell. Each
 
 ```bash
 for d in E:/data/facecam/250913_YW071__2P_YW/run*/; do
-  dc behav compress "$d" "${d%/}.mp4"
+  dcp behav compress "$d" "${d%/}.mp4"
 done
 ```
 

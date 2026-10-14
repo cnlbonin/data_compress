@@ -1,4 +1,4 @@
-"""`dc neuimg ...` commands: probe, compress, verify and restore imaging TIFF stacks or Scanbox `.sbx` recordings."""
+"""`dcp neuimg ...` commands: probe, compress, verify and restore imaging TIFF stacks or Scanbox `.sbx` recordings."""
 
 from __future__ import annotations
 

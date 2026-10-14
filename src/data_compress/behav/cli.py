@@ -1,4 +1,4 @@
-"""`dc behav ...` commands: probe and compress TIFF sequences."""
+"""`dcp behav ...` commands: probe and compress TIFF sequences."""
 
 from __future__ import annotations
 
