@@ -1,4 +1,4 @@
-"""`dc neuimg ...` commands: probe, compress, verify and restore imaging TIFF stacks."""
+"""`dc neuimg ...` commands: probe, compress, verify and restore imaging TIFF stacks or Scanbox `.sbx` recordings."""
 
 from __future__ import annotations
 
@@ -15,11 +15,11 @@ from data_compress.parallel import default_jobs
 console = Console()
 
 app = typer.Typer(
-    help="Losslessly compress widefield / cellular imaging TIFF stacks to Zarr.",
+    help="Losslessly compress imaging TIFF stacks or Scanbox .sbx recordings to Zarr.",
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 
-TifDirArg = typer.Argument(..., exists=True, file_okay=False, dir_okay=True)
+InputArg = typer.Argument(..., exists=True, help="TIFF directory or Scanbox .sbx file")
 JobsOpt = typer.Option(
     None,
     "--jobs",
@@ -34,23 +34,32 @@ def _mb(n_bytes: int) -> str:
 
 
 def _print_probe_report(report: ProbeReport) -> None:
-    height, width = report.shape
-    table = Table(title=f"TIFF probe: {report.tif_dir}")
+    table = Table(title=f"imaging probe: {report.input_path}")
     table.add_column("field")
     table.add_column("value")
-    table.add_row("files", str(len(report.files)))
+    if report.files is not None:
+        table.add_row("files", str(len(report.files)))
     table.add_row("frames", str(report.frame_count))
-    table.add_row("resolution", f"{width}x{height}")
+    if len(report.shape) == 2:
+        height, width = report.shape
+        table.add_row("resolution", f"{width}x{height}")
+    else:
+        n_planes, height, width, n_channels = report.shape
+        table.add_row("resolution", f"{width}x{height}")
+        table.add_row("channels", str(n_channels))
+        table.add_row("planes", str(n_planes))
+        if report.is_volumetric:
+            table.add_row("volumetric", "yes")
     table.add_row("dtype", str(report.dtype))
     table.add_row("size", _mb(report.size_bytes))
     console.print(table)
 
 
 @app.command()
-def probe(tif_dir: Path = TifDirArg) -> None:
-    """Inspect a TIFF directory. Read-only."""
+def probe(input_path: Path = InputArg) -> None:
+    """Inspect a TIFF directory or .sbx file. Read-only."""
     try:
-        report = build_probe_report(tif_dir)
+        report = build_probe_report(input_path)
     except ValueError as exc:
         console.print(f"[bold red]Error:[/] {exc}")
         raise typer.Exit(code=1) from exc
@@ -59,7 +68,7 @@ def probe(tif_dir: Path = TifDirArg) -> None:
 
 @app.command()
 def compress(
-        tif_dir: Path = TifDirArg,
+        input_path: Path = InputArg,
         output: Path = typer.Argument(..., help="Output .zarr directory"),
         fps: float | None = typer.Option(
             None, help="Frame rate, stored as the time-axis scale (omit if unknown)"
@@ -69,11 +78,11 @@ def compress(
         no_verify: bool = typer.Option(False, "--no-verify", help="Skip re-reading and checking the output"),
         jobs: int | None = JobsOpt,
 ) -> None:
-    """Losslessly compress a TIFF directory into a Zarr directory."""
+    """Losslessly compress a TIFF directory or .sbx file into a Zarr directory."""
     try:
-        _print_probe_report(build_probe_report(tif_dir))
+        _print_probe_report(build_probe_report(input_path))
         result = run_compress(
-            tif_dir, output, fps=fps, clevel=clevel, overwrite=overwrite, show_progress=True, jobs=jobs
+            input_path, output, fps=fps, clevel=clevel, overwrite=overwrite, show_progress=True, jobs=jobs
         )
     except (ValueError, FileExistsError) as exc:
         console.print(f"[bold red]Error:[/] {exc}")
@@ -84,13 +93,13 @@ def compress(
         f"({result.ratio:.2f}x)"
     )
     if not no_verify:
-        _verify_and_report(tif_dir, output, jobs)
+        _verify_and_report(input_path, output, jobs)
 
 
-def _verify_and_report(tif_dir: Path, output: Path, jobs: int | None) -> None:
-    check = verify(tif_dir, output, show_progress=True, jobs=jobs)
+def _verify_and_report(input_path: Path, output: Path, jobs: int | None) -> None:
+    check = verify(input_path, output, show_progress=True, jobs=jobs)
 
-    table = Table(title=f"verify: {output.name} vs {tif_dir.name}")
+    table = Table(title=f"verify: {output.name} vs {input_path.name}")
     table.add_column("check")
     table.add_column("value")
     table.add_row("frames", str(check.frame_count))
@@ -102,19 +111,19 @@ def _verify_and_report(tif_dir: Path, output: Path, jobs: int | None) -> None:
     if check.passed:
         console.print("[bold green]PASS[/] decoded frames identical to source")
     else:
-        console.print(f"[bold red]FAIL[/] decoded {output} does not match {tif_dir}")
+        console.print(f"[bold red]FAIL[/] decoded {output} does not match {input_path}")
         raise typer.Exit(code=1)
 
 
 @app.command(name="verify")
 def verify_command(
-        tif_dir: Path = TifDirArg,
+        input_path: Path = InputArg,
         zarr_path: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, help="Compressed .zarr"),
         jobs: int | None = JobsOpt,
 ) -> None:
-    """Re-check a compressed .zarr against its source TIFF directory (e.g. after copying it)."""
+    """Re-check a compressed .zarr against its source (e.g. after copying it)."""
     try:
-        _verify_and_report(tif_dir, zarr_path, jobs)
+        _verify_and_report(input_path, zarr_path, jobs)
     except (ValueError, FileNotFoundError) as exc:
         console.print(f"[bold red]Error:[/] {exc}")
         raise typer.Exit(code=1) from exc
@@ -123,14 +132,14 @@ def verify_command(
 @app.command()
 def decompress(
         zarr_path: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, help="Compressed .zarr"),
-        output_dir: Path = typer.Argument(..., help="Directory to write the restored TIFF files into"),
-        overwrite: bool = typer.Option(False, help="Replace existing TIFF files"),
+        output_dir: Path = typer.Argument(..., help="Directory to write the restored file(s) into"),
+        overwrite: bool = typer.Option(False, help="Replace existing output files"),
         jobs: int | None = JobsOpt,
 ) -> None:
-    """Restore a compressed recording to TIFF files with the original names."""
+    """Restore a compressed recording to its original TIFF files, or to `.sbx` + `.mat`."""
     try:
         written = run_decompress(zarr_path, output_dir, overwrite=overwrite, show_progress=True, jobs=jobs)
     except (ValueError, FileExistsError, KeyError) as exc:
         console.print(f"[bold red]Error:[/] {exc}")
         raise typer.Exit(code=1) from exc
-    console.print(f"[bold green]Done[/] wrote {len(written)} TIFF file(s) to {output_dir}")
+    console.print(f"[bold green]Done[/] wrote {len(written)} file(s) to {output_dir}")

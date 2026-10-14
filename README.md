@@ -45,7 +45,7 @@ See the [behav README](src/data_compress/behav/README.md#install) for details.
 | Command | Data | Docs |
 |---|---|---|
 | `dc behav` | Behavioral camera TIFF sequences (eye/face cams) → mp4/mkv | [behav README](src/data_compress/behav/README.md) |
-| `dc neuimg` | Widefield / cellular imaging TIFF stacks → lossless Zarr (OME-NGFF) | [neuimg README](src/data_compress/neuimg/README.md) |
+| `dc neuimg` | Widefield / cellular imaging TIFF stacks or Scanbox `.sbx` recordings → lossless Zarr (OME-NGFF) | [neuimg README](src/data_compress/neuimg/README.md) |
 | `dc ephys` | SpikeGLX `.bin` recordings (Neuropixels) → WavPack-compressed Zarr | [ephys README](src/data_compress/ephys/README.md) |
 | `dc gui` | Window for batch compression of all three data types (see [GUI](#gui)) | this README |
 

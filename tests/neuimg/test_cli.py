@@ -5,6 +5,7 @@ import tifffile
 from typer.testing import CliRunner
 
 from data_compress.neuimg.cli import app
+from tests.sbx_fixtures import make_frames, write_sbx
 
 runner = CliRunner()
 
@@ -71,3 +72,36 @@ def test_compress_command_refuses_overwrite_without_flag(tmp_path: Path) -> None
 
     assert result.exit_code == 1
     assert "overwrite" in result.stdout
+
+
+def test_probe_reports_sbx_channels_and_planes(tmp_path: Path) -> None:
+    sbx_path = write_sbx(tmp_path / "src", make_frames(4, n_planes=2, height=16, width=16, n_channels=2))
+
+    result = runner.invoke(app, ["probe", str(sbx_path)])
+
+    assert result.exit_code == 0
+    assert "16x16" in result.stdout
+    assert "4" in result.stdout
+
+
+def test_sbx_compress_then_verify_reports_pass(tmp_path: Path) -> None:
+    sbx_path = write_sbx(tmp_path / "src", make_frames(5, height=16, width=16))
+    output = tmp_path / "out.zarr"
+
+    result = runner.invoke(app, ["compress", str(sbx_path), str(output), "--jobs", "1"])
+
+    assert result.exit_code == 0
+    assert "PASS" in result.stdout
+    assert output.exists()
+
+
+def test_sbx_decompress_command_writes_sbx_and_mat(tmp_path: Path) -> None:
+    sbx_path = write_sbx(tmp_path / "src", make_frames(3, height=16, width=16), name="run00")
+    output = tmp_path / "out.zarr"
+    runner.invoke(app, ["compress", str(sbx_path), str(output), "--no-verify", "--jobs", "1"])
+
+    result = runner.invoke(app, ["decompress", str(output), str(tmp_path / "restored"), "--jobs", "1"])
+
+    assert result.exit_code == 0
+    assert (tmp_path / "restored" / "run00.sbx").exists()
+    assert (tmp_path / "restored" / "run00.mat").exists()

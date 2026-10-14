@@ -6,6 +6,7 @@ import tifffile
 import zarr
 
 from data_compress.neuimg.encode import run_compress, run_decompress, verify
+from tests.sbx_fixtures import make_frames, write_sbx
 
 H, W = 20, 24
 
@@ -136,3 +137,64 @@ def test_verify_rejects_a_directory_that_is_not_a_compressed_recording(tmp_path:
 
     with pytest.raises(ValueError, match="not a recording written by"):
         verify(tmp_path / "src", tmp_path / "plain.zarr", jobs=1)
+
+
+@pytest.mark.parametrize("n_planes", [1, 3])
+def test_sbx_compress_then_verify_is_lossless(tmp_path: Path, n_planes: int) -> None:
+    frames = make_frames(6, n_planes=n_planes, height=4, width=5, n_channels=2)
+    sbx_path = write_sbx(tmp_path / "src", frames)
+    output = tmp_path / "out.zarr"
+
+    run_compress(sbx_path, output, jobs=2)
+    check = verify(sbx_path, output, jobs=2)
+
+    assert check.passed
+    assert check.mismatched_frames == 0
+
+
+def test_sbx_decompress_restores_identical_sbx_and_mat_bytes(tmp_path: Path) -> None:
+    frames = make_frames(5, n_planes=2, height=4, width=5, n_channels=2)
+    sbx_path = write_sbx(tmp_path / "src", frames, name="run00")
+    mat_path = sbx_path.with_suffix(".mat")
+    output = tmp_path / "out.zarr"
+    run_compress(sbx_path, output, jobs=3)
+
+    written = run_decompress(output, tmp_path / "restored", jobs=3)
+
+    restored_sbx = tmp_path / "restored" / "run00.sbx"
+    restored_mat = tmp_path / "restored" / "run00.mat"
+    assert set(written) == {restored_sbx, restored_mat}
+    assert restored_sbx.read_bytes() == sbx_path.read_bytes()
+    assert restored_mat.read_bytes() == mat_path.read_bytes()
+
+
+def test_sbx_root_attrs_carry_axes_and_channel_plane_metadata(tmp_path: Path) -> None:
+    frames = make_frames(4, n_planes=3, height=4, width=5, n_channels=2)
+    sbx_path = write_sbx(tmp_path / "src", frames)
+    output = tmp_path / "out.zarr"
+
+    run_compress(sbx_path, output, fps=10.0, jobs=1)
+    root = zarr.open_group(output, mode="r")
+
+    multiscale = root.attrs["ome"]["multiscales"][0]
+    assert [axis["name"] for axis in multiscale["axes"]] == ["t", "z", "y", "x", "c"]
+    assert root.attrs["source_kind"] == "sbx"
+    assert root.attrs["n_channels"] == 2
+    assert root.attrs["n_planes"] == 3
+    assert root.attrs["is_volumetric"] is True
+    assert root["data"].shape == (4, 3, 4, 5, 2)
+    assert root["data"].chunks == (1, 3, 4, 5, 2)
+
+
+def test_sbx_verify_fails_when_source_pixels_change(tmp_path: Path) -> None:
+    write_sbx(tmp_path / "src", make_frames(5, seed=0))
+    sbx_path = tmp_path / "src" / "run00.sbx"
+    output = tmp_path / "out.zarr"
+    run_compress(sbx_path, output, jobs=1)
+
+    write_sbx(tmp_path / "src", make_frames(5, seed=1))  # same layout, different pixels
+    check = verify(sbx_path, output, jobs=1)
+
+    assert not check.passed
+    assert check.shape_matches
+    assert check.mismatched_frames > 0
