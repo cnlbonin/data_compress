@@ -113,8 +113,14 @@ class EncodeResult:
     frame_count_written: int
 
 
+def _requires_even_dims(pix_fmt: str) -> bool:
+    # Chroma-subsampled formats (4:2:0, 4:2:2, ...) need each subsampled axis to
+    # divide evenly; full-res gray formats (gray/gray16le) have no such constraint.
+    return "420" in pix_fmt or "422" in pix_fmt
+
+
 def _build_ffmpeg_cmd(*, width: int, height: int, fps: float, profile: CodecProfile, output: Path) -> list[str]:
-    return [
+    cmd = [
         "ffmpeg",
         "-y",
         "-f",
@@ -127,6 +133,14 @@ def _build_ffmpeg_cmd(*, width: int, height: int, fps: float, profile: CodecProf
         str(fps),
         "-i",
         "-",
+    ]
+
+    if _requires_even_dims(profile.encode_pix_fmt) and (width % 2 or height % 2):
+        padded_width = width + (width % 2)
+        padded_height = height + (height % 2)
+        cmd += ["-vf", f"pad={padded_width}:{padded_height}:0:0:black"]
+
+    cmd += [
         "-c:v",
         profile.ffmpeg_video_codec,
         *profile.extra_args,
@@ -134,6 +148,7 @@ def _build_ffmpeg_cmd(*, width: int, height: int, fps: float, profile: CodecProf
         profile.encode_pix_fmt,
         str(output),
     ]
+    return cmd
 
 
 def run_encode(
@@ -152,6 +167,7 @@ def run_encode(
     info = scan_tiff_dir(tif_dir)
     profile = select_codec_profile(dtype=info.dtype, codec=codec, crf=crf, force=force)
     validate_output_extension(output, profile)
+    output.parent.mkdir(parents=True, exist_ok=True)
     resolved_fps = resolve_fps(tif_dir, fps)
 
     height, width = info.shape
