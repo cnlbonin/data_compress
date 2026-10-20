@@ -30,7 +30,7 @@ def test_compress_then_verify_reports_pass(tmp_path: Path) -> None:
     _write_stack(tmp_path / "src", n_pages=5)
     output = tmp_path / "out.zarr"
 
-    result = runner.invoke(app, ["compress", str(tmp_path / "src"), str(output), "--jobs", "1"])
+    result = runner.invoke(app, ["compress", str(tmp_path / "src"), str(output), "--jobs", "1", "--verify"])
 
     assert result.exit_code == 0
     assert "PASS" in result.stdout
@@ -55,7 +55,7 @@ def test_verify_command_fails_on_mismatch(tmp_path: Path) -> None:
 def test_decompress_command_writes_tiffs(tmp_path: Path) -> None:
     _write_stack(tmp_path / "src", n_pages=3)
     output = tmp_path / "out.zarr"
-    runner.invoke(app, ["compress", str(tmp_path / "src"), str(output), "--no-verify", "--jobs", "1"])
+    runner.invoke(app, ["compress", str(tmp_path / "src"), str(output), "--jobs", "1"])
 
     result = runner.invoke(app, ["decompress", str(output), str(tmp_path / "restored"), "--jobs", "1"])
 
@@ -66,7 +66,7 @@ def test_decompress_command_writes_tiffs(tmp_path: Path) -> None:
 def test_compress_command_refuses_overwrite_without_flag(tmp_path: Path) -> None:
     _write_stack(tmp_path / "src", n_pages=2)
     output = tmp_path / "out.zarr"
-    runner.invoke(app, ["compress", str(tmp_path / "src"), str(output), "--no-verify", "--jobs", "1"])
+    runner.invoke(app, ["compress", str(tmp_path / "src"), str(output), "--jobs", "1"])
 
     result = runner.invoke(app, ["compress", str(tmp_path / "src"), str(output), "--jobs", "1"])
 
@@ -88,7 +88,7 @@ def test_sbx_compress_then_verify_reports_pass(tmp_path: Path) -> None:
     sbx_path = write_sbx(tmp_path / "src", make_frames(5, height=16, width=16))
     output = tmp_path / "out.zarr"
 
-    result = runner.invoke(app, ["compress", str(sbx_path), str(output), "--jobs", "1"])
+    result = runner.invoke(app, ["compress", str(sbx_path), str(output), "--jobs", "1", "--verify"])
 
     assert result.exit_code == 0
     assert "PASS" in result.stdout
@@ -98,7 +98,7 @@ def test_sbx_compress_then_verify_reports_pass(tmp_path: Path) -> None:
 def test_sbx_decompress_command_writes_sbx_and_mat(tmp_path: Path) -> None:
     sbx_path = write_sbx(tmp_path / "src", make_frames(3, height=16, width=16), name="run00")
     output = tmp_path / "out.zarr"
-    runner.invoke(app, ["compress", str(sbx_path), str(output), "--no-verify", "--jobs", "1"])
+    runner.invoke(app, ["compress", str(sbx_path), str(output), "--jobs", "1"])
 
     result = runner.invoke(app, ["decompress", str(output), str(tmp_path / "restored"), "--jobs", "1"])
 

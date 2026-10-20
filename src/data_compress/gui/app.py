@@ -68,7 +68,7 @@ class BatchApp(tk.Tk):
         self.codec = tk.StringVar(value="lossy")
         self.bps = tk.StringVar(value="")
         self.behav_fps = tk.StringVar(value="")
-        self.verify = tk.BooleanVar(value=True)
+        self.verify = tk.BooleanVar(value=False)
         self.controls: list[ttk.Widget] = []  # disabled while a batch runs
 
         self._build()

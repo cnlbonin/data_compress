@@ -41,7 +41,7 @@ def test_probe_command_reports_channels_and_rate(tmp_path: Path) -> None:
 def test_compress_lossless_passes_verification(tmp_path: Path) -> None:
     out = tmp_path / "rec.zarr"
 
-    result = runner.invoke(app, ["compress", str(_bin(tmp_path)), str(out)])
+    result = runner.invoke(app, ["compress", str(_bin(tmp_path)), str(out), "--verify"])
 
     assert result.exit_code == 0, result.stdout
     assert "PASS" in result.stdout
@@ -49,7 +49,9 @@ def test_compress_lossless_passes_verification(tmp_path: Path) -> None:
 
 
 def test_compress_lossy_passes_and_reports_error(tmp_path: Path) -> None:
-    result = runner.invoke(app, ["compress", str(_bin(tmp_path)), str(tmp_path / "rec.zarr"), "--bps", "3"])
+    result = runner.invoke(
+        app, ["compress", str(_bin(tmp_path)), str(tmp_path / "rec.zarr"), "--bps", "3", "--verify"]
+    )
 
     assert result.exit_code == 0, result.stdout
     assert "PASS" in result.stdout
@@ -85,7 +87,7 @@ def test_compress_existing_output_errors_without_overwrite(tmp_path: Path) -> No
 def test_decompress_restores_bin(tmp_path: Path) -> None:
     bin_path = _bin(tmp_path)
     out = tmp_path / "rec.zarr"
-    runner.invoke(app, ["compress", str(bin_path), str(out), "--no-verify"])
+    runner.invoke(app, ["compress", str(bin_path), str(out)])
     restored = tmp_path / "restored" / bin_path.name
 
     result = runner.invoke(app, ["decompress", str(out), str(restored)])
@@ -97,7 +99,7 @@ def test_decompress_restores_bin(tmp_path: Path) -> None:
 def test_verify_command_passes_on_lossless_output(tmp_path: Path) -> None:
     bin_path = _bin(tmp_path)
     out = tmp_path / "rec.zarr"
-    runner.invoke(app, ["compress", str(bin_path), str(out), "--no-verify"])
+    runner.invoke(app, ["compress", str(bin_path), str(out)])
 
     result = runner.invoke(app, ["verify", str(bin_path), str(out)])
 
@@ -109,7 +111,7 @@ def test_verify_command_passes_on_lossless_output(tmp_path: Path) -> None:
 def test_verify_command_reports_lossy_error(tmp_path: Path) -> None:
     bin_path = _bin(tmp_path)
     out = tmp_path / "rec.zarr"
-    runner.invoke(app, ["compress", str(bin_path), str(out), "--bps", "3", "--no-verify"])
+    runner.invoke(app, ["compress", str(bin_path), str(out), "--bps", "3"])
 
     result = runner.invoke(app, ["verify", str(bin_path), str(out)])
 
@@ -124,7 +126,7 @@ def test_verify_command_fails_on_corrupted_output(tmp_path: Path) -> None:
 
     bin_path = _bin(tmp_path)
     out = tmp_path / "rec.zarr"
-    runner.invoke(app, ["compress", str(bin_path), str(out), "--no-verify"])
+    runner.invoke(app, ["compress", str(bin_path), str(out)])
     traces = zarr.open_group(out, mode="r+")["traces_seg0"]
     traces[5, 2] = traces[5, 2] + 1
 
@@ -137,7 +139,7 @@ def test_verify_command_fails_on_corrupted_output(tmp_path: Path) -> None:
 def test_verify_command_fails_on_different_recording(tmp_path: Path) -> None:
     bin_path = _bin(tmp_path)
     out = tmp_path / "rec.zarr"
-    runner.invoke(app, ["compress", str(bin_path), str(out), "--no-verify"])
+    runner.invoke(app, ["compress", str(bin_path), str(out)])
     other_dir = tmp_path / "other"
     other_dir.mkdir()
     other = write_spikeglx(other_dir, make_traces(2000, n_neural=8, seed=1), sample_rate=1000.0)
@@ -163,7 +165,7 @@ def test_compress_accepts_jobs_and_round_trips(tmp_path: Path) -> None:
     bin_path = _bin(tmp_path)
     out = tmp_path / "rec.zarr"
 
-    result = runner.invoke(app, ["compress", str(bin_path), str(out), "--jobs", "2"])
+    result = runner.invoke(app, ["compress", str(bin_path), str(out), "--jobs", "2", "--verify"])
 
     assert result.exit_code == 0, result.stdout
     assert "PASS" in result.stdout

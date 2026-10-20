@@ -75,7 +75,7 @@ def compress(
         ),
         clevel: int = typer.Option(DEFAULT_CLEVEL, help="Blosc zstd level 0-9 (higher: smaller, slower)"),
         overwrite: bool = typer.Option(False, help="Replace an existing output"),
-        no_verify: bool = typer.Option(False, "--no-verify", help="Skip re-reading and checking the output"),
+        verify: bool = typer.Option(False, "--verify", help="Re-read and check the output after compressing"),
         jobs: int | None = JobsOpt,
 ) -> None:
     """Losslessly compress a TIFF directory or .sbx file into a Zarr directory."""
@@ -92,7 +92,7 @@ def compress(
         f"wrote {output} (lossless): {_mb(result.original_bytes)} -> {_mb(result.compressed_bytes)} "
         f"({result.ratio:.2f}x)"
     )
-    if not no_verify:
+    if verify:
         _verify_and_report(input_path, output, jobs)
 
 

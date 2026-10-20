@@ -35,7 +35,7 @@ class Options:
     behav_codec: str = "lossy"  # "lossy" (mp4) or "lossless" (mkv)
     behav_fps: float | None = None  # None = read from each session's .camlog
     ephys_bps: float | None = None  # None = lossless
-    verify: bool = True
+    verify: bool = False
 
 
 @dataclass(frozen=True)

@@ -74,7 +74,7 @@ def compress(
         ),
         level: int = typer.Option(DEFAULT_LEVEL, help="WavPack effort level 1-4 (higher: smaller, slower)"),
         overwrite: bool = typer.Option(False, help="Replace an existing output"),
-        no_verify: bool = typer.Option(False, "--no-verify", help="Skip re-reading and checking the output"),
+        verify: bool = typer.Option(False, "--verify", help="Re-read and check the output after compressing"),
         jobs: int | None = JobsOpt,
 ) -> None:
     """Compress a SpikeGLX .bin into a WavPack-compressed Zarr directory."""
@@ -98,7 +98,7 @@ def compress(
         f"wrote {output} ({mode}): {_mb(result.original_bytes)} -> {_mb(result.compressed_bytes)} "
         f"({result.ratio:.2f}x)"
     )
-    if not no_verify:
+    if verify:
         _verify_and_report(bin_path, output, jobs)
 
 

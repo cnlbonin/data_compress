@@ -49,7 +49,7 @@ def test_compress_command_succeeds_and_reports_pass(tmp_path: Path) -> None:
     _write_stack(tmp_path / "run_0000.tif", n_pages=5)
     output = tmp_path / "out.mp4"
 
-    result = runner.invoke(app, ["compress", str(tmp_path), str(output), "--fps", "10"])
+    result = runner.invoke(app, ["compress", str(tmp_path), str(output), "--fps", "10", "--verify"])
 
     assert result.exit_code == 0
     assert "PASS" in result.stdout

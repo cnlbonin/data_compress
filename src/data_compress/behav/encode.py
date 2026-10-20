@@ -29,7 +29,15 @@ class CodecProfile:
     downconvert_16_to_8: bool = False
 
 
-def select_codec_profile(*, dtype: np.dtype, codec: str, crf: int | None, force: bool) -> CodecProfile:
+def select_codec_profile(
+        *,
+        dtype: np.dtype,
+        codec: str,
+        crf: int | None,
+        force: bool,
+        encoder: str = "cpu",
+        preset: str | None = None,
+) -> CodecProfile:
     if dtype.kind != "u" or dtype.itemsize not in (1, 2):
         raise ValueError(
             f"unsupported dtype {dtype}; only uint8/uint16 grayscale TIFF sources are supported"
@@ -42,23 +50,35 @@ def select_codec_profile(*, dtype: np.dtype, codec: str, crf: int | None, force:
                 "16-bit source would be truncated by the lossy codec; "
                 "use codec='lossless' or pass force=True to proceed anyway"
             )
+        if encoder not in ("cpu", "nvenc"):
+            raise ValueError(f"unknown encoder {encoder!r}; expected 'cpu' or 'nvenc'")
+
+        resolved_crf = crf if crf is not None else DEFAULT_LOSSY_CRF
+        if encoder == "nvenc":
+            # NVENC has no -crf; -rc vbr -cq <q> -b:v 0 is the closest analogue
+            # (quality-targeted, unconstrained bitrate). Presets are p1 (fastest)
+            # .. p7 (slowest/best), unlike x265's named presets.
+            video_codec = "hevc_nvenc"
+            extra_args = ["-rc", "vbr", "-cq", str(resolved_crf), "-b:v", "0"]
+        else:
+            video_codec = "libx265"
+            extra_args = ["-crf", str(resolved_crf)]
+        if preset is not None:
+            extra_args += ["-preset", preset]
+        # Apple players (QuickTime/QuickLook) only accept HEVC-in-mp4 tagged hvc1;
+        # ffmpeg defaults to hev1.
+        extra_args += ["-tag:v", "hvc1"]
+
         return CodecProfile(
             container_ext=".mp4",
-            ffmpeg_video_codec="libx265",
+            ffmpeg_video_codec=video_codec,
             pix_fmt="gray",
             # Encoding monochrome HEVC directly (4:0:0 chroma) forces the "Rext"
             # profile, which QuickTime and most hardware decoders (incl. Apple
             # VideoToolbox) refuse to open. yuv420p keeps the Main profile, at
             # near-zero extra cost since the added chroma plane is constant.
             encode_pix_fmt="yuv420p",
-            # Apple players (QuickTime/QuickLook) only accept HEVC-in-mp4 tagged hvc1;
-            # ffmpeg defaults to hev1.
-            extra_args=[
-                "-crf",
-                str(crf if crf is not None else DEFAULT_LOSSY_CRF),
-                "-tag:v",
-                "hvc1",
-            ],
+            extra_args=extra_args,
             # forcing a 16-bit source through this 8-bit pix_fmt requires actually
             # truncating each frame's bit depth, or ffmpeg's declared frame byte-size
             # (1 byte/px) desyncs from the raw stream we send (2 bytes/px) and it
@@ -67,6 +87,8 @@ def select_codec_profile(*, dtype: np.dtype, codec: str, crf: int | None, force:
         )
 
     if codec == "lossless":
+        if encoder != "cpu":
+            raise ValueError("encoder='nvenc' is not supported for the lossless (FFV1) codec")
         pix_fmt = "gray16le" if is_16bit else "gray"
         return CodecProfile(
             container_ext=".mkv",
@@ -159,13 +181,17 @@ def run_encode(
         codec: str = "lossy",
         crf: int | None = None,
         force: bool = False,
+        encoder: str = "cpu",
+        preset: str | None = None,
         show_progress: bool = False,
         on_progress: Callable[[int, int], None] | None = None,
 ) -> EncodeResult:
     check_binaries_available()
 
     info = scan_tiff_dir(tif_dir)
-    profile = select_codec_profile(dtype=info.dtype, codec=codec, crf=crf, force=force)
+    profile = select_codec_profile(
+        dtype=info.dtype, codec=codec, crf=crf, force=force, encoder=encoder, preset=preset
+    )
     validate_output_extension(output, profile)
     output.parent.mkdir(parents=True, exist_ok=True)
     resolved_fps = resolve_fps(tif_dir, fps)
